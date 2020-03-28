@@ -1,0 +1,58 @@
+{
+  "slug": "rackwindows",
+  "name": "Rackwindows",
+  "version": "1.0.0",
+  "license": "MIT",
+  "brand": "Rackwindows",
+  "author": "Jens Robert Janke",
+  "authorEmail": "jensrobertjanke@gmail.com",
+  "authorUrl": "www.jensrobertjanke.com",
+  "pluginUrl": "",
+  "manualUrl": "",
+  "sourceUrl": "",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [{
+      "slug": "bitshiftgain",
+      "name": "Dual BSG",
+      "description": "Dual gain shifter",
+      "tags": ["Attenuator", "Dual", "Utility"]
+    },
+    {
+      "slug": "mv",
+      "name": "MV",
+      "description": "Dual-mono reverb",
+      "tags": ["Effect", "Reverb"]
+    },
+    {
+      "slug": "tape",
+      "name": "Tape",
+      "description": "All-purpose tape mojo",
+      "tags": ["Distortion", "Effect"]
+    },
+    {
+      "slug": "vibrato",
+      "name": "Vibrato",
+      "description": "FM vibrator o_O",
+      "tags": ["Chorus", "Clock generator", "Effect", "Flanger", "Utility"]
+    },
+    {
+      "slug": "chorus",
+      "name": "Chorus",
+      "description": "Mono chorus with multi-tap option",
+      "tags": ["Chorus", "Delay", "Effect"]
+    },
+    {
+      "slug": "hombre",
+      "name": "Hombre",
+      "description": "Texas tone and texture",
+      "tags": ["Distortion", "Effect"]
+    },
+    {
+      "slug": "capacitor",
+      "name": "Capacitor",
+      "description": "Filters",
+      "tags": ["Equalizer", "Filter"]
+    }
+  ]
+}
