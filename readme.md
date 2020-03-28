@@ -1,74 +1,69 @@
-# A collection of VCV Rack modules based on the fabulous plugins by Chris Johnson from Airwindows
+# A collection of VCV Rack modules based on audio plugins by Chris Johnson from Airwindows
 
-Note: As of April 2020, this collection is still a work in progress and not yet ready for prime time. 
+![Rackwindows Modules](res/images/modules.jpg)
 
-Most of these modules are straight-up ports of Airwindows plugins with the addition of a panel (designed to be potentially buildable in hardware) and the occasional tweak or enhancement here and there to take advantage of the modular environment.
+NOTE: As of April 2020, this collection is still a work in progress and not yet ready for prime time. 
+
+Most of these modules are straight-up ports of [Airwindows](http://www.airwindows.com) plugins with the addition of a panel (designed to be potentially buildable in hardware) and the occasional tweak or enhancement here and there to take advantage of the modular environment.
 
 Airwindows plugins are known for exceptional sound quality, innovative approaches and minimalist interfaces. They often focus on and excel at one specific task, which is why I think they are a natural fit for Rack.
 
-For more in-depth information on the inner workings of a particular Airwindows plugin please check Chris' website. There is a video on every plugin along with a description and I encourage everyone to explore his body of work. Chances are you stumble upon other gems here and there. He's got a Patreon if you appreciate and want to support what he does.
+For more in-depth information on the inner workings of a particular Airwindows plugin please check Chris' [website](http://www.airwindows.com). There is a video on every plugin along with a description and I encourage everyone to explore his body of work. Chances are you stumble upon other gems here and there. He's got a [Patreon](https://www.patreon.com/airwindows) if you appreciate and want to support what he does.
 
 ## Licence
 
-See ./LICENSE.md for all licenses
+See [LICENSE.md](LICENSE.md) for all licenses
 
 ## Modules
 
-    - Capacitor
-    - Chorus
-    - Dual BSG
-    - Hombre
-    - MV
-    - Tape
-    - Vibrato
+- [Capacitor](#capacitor): Lowpass and highpass filters
+- [Chorus](#chorus): Mono chorus with multi-tap option
+- [Dual BSG](#dual-bsg): Dual gain shifter
+- [Hombre](#hombre): Texas tone and texture
+- [MV](#mv): Dual-mono reverb
+- [Tape](#tape): All-purpose tape mojo
+- [Vibrato](#vibrato): FM Vibrator o_O
 
-[img]
-### Capacitor
+## Capacitor <a id="capacitor"></a>
 
-Filter
-
-Description coming soon...
-
-[img]
-### Chorus
-
-Mono chorus with multi-tap option
+![Rackwindows Capacitor](res/images/capacitor.jpg)
 
 Description coming soon...
 
-[img]
-### Dual BSG
+## Chorus <a id="chorus"></a>
 
-Dual gain shifter
+![Rackwindows Chorus](res/images/chorus.jpg)
+
+Description coming soon...
+
+## Dual BSG <a id="dual-bsg"></a>
+
+![Rackwindows Dual BSG](res/images/dual_bsg.jpg)
 
 Note that if no input is connected, the respective output will provide constant voltage selectable in 1V steps from -8V to +8V.
 
 More coming soon...
 
-[img]
-### Hombre
+## Hombre <a id="hombre"></a>
 
-Texas tone and texture
-
-Description coming soon...
-
-[img]
-### MV
-
-Dual-mono reverb
+![Rackwindows Hombre](res/images/hombre.jpg)
 
 Description coming soon...
 
-[img]
-### Tape
+## MV <a id="mv"></a>
 
-All-purpose tape mojo
+![Rackwindows MV](res/images/mv.jpg)
 
 Description coming soon...
 
-[img]
-### Vibrato
+## Tape <a id="tape"></a>
 
-FM vibrator o_O
+![Rackwindows Tape](res/images/tape.jpg)
+
+Description coming soon...
+
+## Vibrato <a id="vibrato"></a>
+
+![Rackwindows Vibrato](res/images/vibrato.jpg)
 
 Description coming soon...
