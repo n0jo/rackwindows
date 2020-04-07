@@ -1,6 +1,6 @@
 # A collection of VCV Rack modules based on audio plugins by Chris Johnson from Airwindows
 
-![Rackwindows Modules](res/images/modules.jpg)
+![Rackwindows Modules](res/images/rackwindows_panels.jpg)
 
 NOTE: As of now, this collection is still a work in progress.
 
@@ -28,7 +28,7 @@ See [LICENSE.md](LICENSE.md) for all licenses
 
 ![Rackwindows Capacitor](res/images/capacitor.jpg)
 
-Low- and highpass filters. Comes in both mono and stereo, with the stereo version featuring an additional dry/wet control.
+Filters. Comes in both mono and stereo, with the stereo version featuring an additional dry/wet control.
 
 ## Chorus <a id="chorus"></a>
 
