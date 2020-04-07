@@ -18,6 +18,7 @@ See [LICENSE.md](LICENSE.md) for all licenses
 
 - [Capacitor Mono/Stereo](#capacitor): Filters
 - [Chorus](#chorus): Mono chorus with multi-tap option
+- [Distance](#distance): Designed to mimic through-air high frequency attenuation
 - [Dual BSG](#dual-bsg): Dual gain shifter
 - [Hombre](#hombre): Texas tone and texture
 - [MV](#mv): Dual-mono reverb
@@ -26,19 +27,25 @@ See [LICENSE.md](LICENSE.md) for all licenses
 
 ## Capacitor <a id="capacitor"></a>
 
-![Rackwindows Capacitor](res/images/capacitor.jpg)
+![Rackwindows Capacitor](res/images/capacitor_panels.jpg)
 
 Filters. Comes in both mono and stereo, with the stereo version featuring an additional dry/wet control.
 
 ## Chorus <a id="chorus"></a>
 
-![Rackwindows Chorus](res/images/chorus.jpg)
+![Rackwindows Chorus](res/images/chorus_panels.jpg)
+
+Description coming soon...
+
+## Distance <a id="distance"></a>
+
+![Rackwindows Distance](res/images/distance_panels.jpg)
 
 Description coming soon...
 
 ## Dual BSG <a id="dual-bsg"></a>
 
-![Rackwindows Dual BSG](res/images/dual_bsg.jpg)
+![Rackwindows Dual BSG](res/images/dual_bsg_panels.jpg)
 
 Note that if no input is connected, the respective output will provide constant voltage selectable in 1V steps from -8V to +8V.
 
@@ -46,19 +53,19 @@ More coming soon...
 
 ## Hombre <a id="hombre"></a>
 
-![Rackwindows Hombre](res/images/hombre.jpg)
+![Rackwindows Hombre](res/images/hombre_panels.jpg)
 
 Description coming soon...
 
 ## MV <a id="mv"></a>
 
-![Rackwindows MV](res/images/mv.jpg)
+![Rackwindows MV](res/images/mv_panels.jpg)
 
 Description coming soon...
 
 ## Tremolo <a id="tremolo"></a>
 
-![Rackwindows Tremolo](res/images/tremolo.jpg)
+![Rackwindows Tremolo](res/images/tremolo_panels.jpg)
 
 Instead of volume animation Tremolo uses fluctuating saturation and antisaturation curves to create a more organic, somewhat tubey tremolo effect.
 
@@ -66,10 +73,10 @@ More coming soon...
 
 ## Vibrato <a id="vibrato"></a>
 
-![Rackwindows Vibrato](res/images/vibrato.jpg)
+![Rackwindows Vibrato](res/images/vibrato_panels.jpg)
 
 Description coming soon...
 
 ## Colophon
 
-The typeface used is Barlow by Jeremy Tribby
+The typeface used is [Barlow](https://github.com/jpt/barlow) by Jeremy Tribby
