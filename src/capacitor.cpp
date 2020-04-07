@@ -1,6 +1,6 @@
 /***********************************************************************************************
-Capacitor Mono
--------
+Capacitor
+---------
 VCV Rack module based on Capacitor by Chris Johnson from Airwindows <www.airwindows.com>
 
 Ported and designed by Jens Robert Janke 
@@ -51,19 +51,6 @@ struct Capacitor : Module {
     double iirLowpassEL;
     double iirLowpassFL;
 
-    // double iirHighpassAR;
-    // double iirHighpassBR;
-    // double iirHighpassCR;
-    // double iirHighpassDR;
-    // double iirHighpassER;
-    // double iirHighpassFR;
-    // double iirLowpassAR;
-    // double iirLowpassBR;
-    // double iirLowpassCR;
-    // double iirLowpassDR;
-    // double iirLowpassER;
-    // double iirLowpassFR;
-
     int count;
 
     double lowpassChase;
@@ -89,9 +76,9 @@ struct Capacitor : Module {
     Capacitor()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(LOWPASS_PARAM, 0.f, 1.f, 1.f, "");
-        configParam(HIGHPASS_PARAM, 0.f, 1.f, 0.f, "");
-        configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "");
+        configParam(LOWPASS_PARAM, 0.f, 1.f, 1.f, "Lowpass");
+        configParam(HIGHPASS_PARAM, 0.f, 1.f, 0.f, "Highpass");
+        configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
 
         iirHighpassAL = 0.0;
         iirHighpassBL = 0.0;
@@ -106,18 +93,6 @@ struct Capacitor : Module {
         iirLowpassEL = 0.0;
         iirLowpassFL = 0.0;
 
-        // iirHighpassAR = 0.0;
-        // iirHighpassBR = 0.0;
-        // iirHighpassCR = 0.0;
-        // iirHighpassDR = 0.0;
-        // iirHighpassER = 0.0;
-        // iirHighpassFR = 0.0;
-        // iirLowpassAR = 0.0;
-        // iirLowpassBR = 0.0;
-        // iirLowpassCR = 0.0;
-        // iirLowpassDR = 0.0;
-        // iirLowpassER = 0.0;
-        // iirLowpassFR = 0.0;
         count = 0;
         lowpassChase = 0.0;
         highpassChase = 0.0;
@@ -136,282 +111,180 @@ struct Capacitor : Module {
 
     void process(const ProcessArgs& args) override
     {
-        // params
-        A = params[LOWPASS_PARAM].getValue();
-        A += inputs[LOWPASS_CV_INPUT].getVoltage() / 5;
-        A = clamp(A, 0.01f, 0.99f);
+        if (outputs[OUT_OUTPUT].isConnected()) {
 
-        B = params[HIGHPASS_PARAM].getValue();
-        B += inputs[HIGHPASS_CV_INPUT].getVoltage() / 5;
-        B = clamp(B, 0.01f, 0.99f);
+            // params
+            A = params[LOWPASS_PARAM].getValue();
+            A += inputs[LOWPASS_CV_INPUT].getVoltage() / 5;
+            A = clamp(A, 0.01f, 0.99f);
 
-        C = 1.0;
+            B = params[HIGHPASS_PARAM].getValue();
+            B += inputs[HIGHPASS_CV_INPUT].getVoltage() / 5;
+            B = clamp(B, 0.01f, 0.99f);
 
-        // input
-        float in1 = inputs[IN_INPUT].getVoltage();
+            C = 1.0;
 
-        lowpassChase = pow(A, 2);
-        highpassChase = pow(B, 2);
-        wetChase = C;
-        //should not scale with sample rate, because values reaching 1 are important
-        //to its ability to bypass when set to max
-        double lowpassSpeed = 300 / (fabs(lastLowpass - lowpassChase) + 1.0);
-        double highpassSpeed = 300 / (fabs(lastHighpass - highpassChase) + 1.0);
-        double wetSpeed = 300 / (fabs(lastWet - wetChase) + 1.0);
-        lastLowpass = lowpassChase;
-        lastHighpass = highpassChase;
-        lastWet = wetChase;
+            // input
+            float in1 = inputs[IN_INPUT].getVoltage();
 
-        double invLowpass;
-        double invHighpass;
-        double dry;
+            lowpassChase = pow(A, 2);
+            highpassChase = pow(B, 2);
+            wetChase = C;
+            //should not scale with sample rate, because values reaching 1 are important
+            //to its ability to bypass when set to max
+            double lowpassSpeed = 300 / (fabs(lastLowpass - lowpassChase) + 1.0);
+            double highpassSpeed = 300 / (fabs(lastHighpass - highpassChase) + 1.0);
+            double wetSpeed = 300 / (fabs(lastWet - wetChase) + 1.0);
+            lastLowpass = lowpassChase;
+            lastHighpass = highpassChase;
+            lastWet = wetChase;
 
-        long double inputSampleL;
-        // long double inputSampleR;
-        float drySampleL;
-        // float drySampleR;
+            double invLowpass;
+            double invHighpass;
+            double dry;
 
-        inputSampleL = in1;
-        // inputSampleR = in1;
-        if (inputSampleL < 1.2e-38 && -inputSampleL < 1.2e-38) {
-            static int noisesource = 0;
-            //this declares a variable before anything else is compiled. It won't keep assigning
-            //it to 0 for every sample, it's as if the declaration doesn't exist in this context,
-            //but it lets me add this denormalization fix in a single place rather than updating
-            //it in three different locations. The variable isn't thread-safe but this is only
-            //a random seed and we can share it with whatever.
-            noisesource = noisesource % 1700021;
-            noisesource++;
-            int residue = noisesource * noisesource;
-            residue = residue % 170003;
-            residue *= residue;
-            residue = residue % 17011;
-            residue *= residue;
-            residue = residue % 1709;
-            residue *= residue;
-            residue = residue % 173;
-            residue *= residue;
-            residue = residue % 17;
-            double applyresidue = residue;
-            applyresidue *= 0.00000001;
-            applyresidue *= 0.00000001;
-            inputSampleL = applyresidue;
+            long double inputSampleL;
+            float drySampleL;
+
+            inputSampleL = in1;
+            if (inputSampleL < 1.2e-38 && -inputSampleL < 1.2e-38) {
+                static int noisesource = 0;
+                //this declares a variable before anything else is compiled. It won't keep assigning
+                //it to 0 for every sample, it's as if the declaration doesn't exist in this context,
+                //but it lets me add this denormalization fix in a single place rather than updating
+                //it in three different locations. The variable isn't thread-safe but this is only
+                //a random seed and we can share it with whatever.
+                noisesource = noisesource % 1700021;
+                noisesource++;
+                int residue = noisesource * noisesource;
+                residue = residue % 170003;
+                residue *= residue;
+                residue = residue % 17011;
+                residue *= residue;
+                residue = residue % 1709;
+                residue *= residue;
+                residue = residue % 173;
+                residue *= residue;
+                residue = residue % 17;
+                double applyresidue = residue;
+                applyresidue *= 0.00000001;
+                applyresidue *= 0.00000001;
+                inputSampleL = applyresidue;
+            }
+            drySampleL = inputSampleL;
+
+            lowpassAmount = (((lowpassAmount * lowpassSpeed) + lowpassChase) / (lowpassSpeed + 1.0));
+            invLowpass = 1.0 - lowpassAmount;
+            highpassAmount = (((highpassAmount * highpassSpeed) + highpassChase) / (highpassSpeed + 1.0));
+            invHighpass = 1.0 - highpassAmount;
+            wet = (((wet * wetSpeed) + wetChase) / (wetSpeed + 1.0));
+            dry = 1.0 - wet;
+
+            count++;
+            if (count > 5)
+                count = 0;
+            switch (count) {
+            case 0:
+                iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassAL;
+                iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassAL;
+                iirHighpassBL = (iirHighpassBL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassBL;
+                iirLowpassBL = (iirLowpassBL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassBL;
+                iirHighpassDL = (iirHighpassDL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassDL;
+                iirLowpassDL = (iirLowpassDL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassDL;
+                break;
+            case 1:
+                iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassAL;
+                iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassAL;
+                iirHighpassCL = (iirHighpassCL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassCL;
+                iirLowpassCL = (iirLowpassCL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassCL;
+                iirHighpassEL = (iirHighpassEL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassEL;
+                iirLowpassEL = (iirLowpassEL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassEL;
+                break;
+            case 2:
+                iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassAL;
+                iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassAL;
+                iirHighpassBL = (iirHighpassBL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassBL;
+                iirLowpassBL = (iirLowpassBL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassBL;
+                iirHighpassFL = (iirHighpassFL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassFL;
+                iirLowpassFL = (iirLowpassFL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassFL;
+                break;
+            case 3:
+                iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassAL;
+                iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassAL;
+                iirHighpassCL = (iirHighpassCL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassCL;
+                iirLowpassCL = (iirLowpassCL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassCL;
+                iirHighpassDL = (iirHighpassDL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassDL;
+                iirLowpassDL = (iirLowpassDL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassDL;
+                break;
+            case 4:
+                iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassAL;
+                iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassAL;
+                iirHighpassBL = (iirHighpassBL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassBL;
+                iirLowpassBL = (iirLowpassBL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassBL;
+                iirHighpassEL = (iirHighpassEL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassEL;
+                iirLowpassEL = (iirLowpassEL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassEL;
+                break;
+            case 5:
+                iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassAL;
+                iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassAL;
+                iirHighpassCL = (iirHighpassCL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassCL;
+                iirLowpassCL = (iirLowpassCL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassCL;
+                iirHighpassFL = (iirHighpassFL * invHighpass) + (inputSampleL * highpassAmount);
+                inputSampleL -= iirHighpassFL;
+                iirLowpassFL = (iirLowpassFL * invLowpass) + (inputSampleL * lowpassAmount);
+                inputSampleL = iirLowpassFL;
+                break;
+            }
+            //Highpass Filter chunk. This is three poles of IIR highpass, with a 'gearbox' that progressively
+            //steepens the filter after minimizing artifacts.
+
+            inputSampleL = (drySampleL * dry) + (inputSampleL * wet);
+
+            //stereo 32 bit dither, made small and tidy.
+            int expon;
+            frexpf((float)inputSampleL, &expon);
+            long double dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
+            inputSampleL += (dither - fpNShapeL);
+            fpNShapeL = dither;
+            //end 32 bit dither
+
+            // output
+            outputs[OUT_OUTPUT].setVoltage(inputSampleL);
         }
-        // if (inputSampleR < 1.2e-38 && -inputSampleR < 1.2e-38) {
-        //     static int noisesource = 0;
-        //     noisesource = noisesource % 1700021;
-        //     noisesource++;
-        //     int residue = noisesource * noisesource;
-        //     residue = residue % 170003;
-        //     residue *= residue;
-        //     residue = residue % 17011;
-        //     residue *= residue;
-        //     residue = residue % 1709;
-        //     residue *= residue;
-        //     residue = residue % 173;
-        //     residue *= residue;
-        //     residue = residue % 17;
-        //     double applyresidue = residue;
-        //     applyresidue *= 0.00000001;
-        //     applyresidue *= 0.00000001;
-        //     inputSampleR = applyresidue;
-        //     //this denormalization routine produces a white noise at -300 dB which the noise
-        //     //shaping will interact with to produce a bipolar output, but the noise is actually
-        //     //all positive. That should stop any variables from going denormal, and the routine
-        //     //only kicks in if digital black is input. As a final touch, if you save to 24-bit
-        //     //the silence will return to being digital black again.
-        // }
-        drySampleL = inputSampleL;
-        // drySampleR = inputSampleR;
-
-        lowpassAmount = (((lowpassAmount * lowpassSpeed) + lowpassChase) / (lowpassSpeed + 1.0));
-        invLowpass = 1.0 - lowpassAmount;
-        highpassAmount = (((highpassAmount * highpassSpeed) + highpassChase) / (highpassSpeed + 1.0));
-        invHighpass = 1.0 - highpassAmount;
-        wet = (((wet * wetSpeed) + wetChase) / (wetSpeed + 1.0));
-        dry = 1.0 - wet;
-
-        count++;
-        if (count > 5)
-            count = 0;
-        switch (count) {
-        case 0:
-            iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassAL;
-            iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassAL;
-            iirHighpassBL = (iirHighpassBL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassBL;
-            iirLowpassBL = (iirLowpassBL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassBL;
-            iirHighpassDL = (iirHighpassDL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassDL;
-            iirLowpassDL = (iirLowpassDL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassDL;
-            // iirHighpassAR = (iirHighpassAR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassAR;
-            // iirLowpassAR = (iirLowpassAR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassAR;
-            // iirHighpassBR = (iirHighpassBR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassBR;
-            // iirLowpassBR = (iirLowpassBR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassBR;
-            // iirHighpassDR = (iirHighpassDR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassDR;
-            // iirLowpassDR = (iirLowpassDR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassDR;
-            break;
-        case 1:
-            iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassAL;
-            iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassAL;
-            iirHighpassCL = (iirHighpassCL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassCL;
-            iirLowpassCL = (iirLowpassCL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassCL;
-            iirHighpassEL = (iirHighpassEL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassEL;
-            iirLowpassEL = (iirLowpassEL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassEL;
-            // iirHighpassAR = (iirHighpassAR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassAR;
-            // iirLowpassAR = (iirLowpassAR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassAR;
-            // iirHighpassCR = (iirHighpassCR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassCR;
-            // iirLowpassCR = (iirLowpassCR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassCR;
-            // iirHighpassER = (iirHighpassER * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassER;
-            // iirLowpassER = (iirLowpassER * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassER;
-            break;
-        case 2:
-            iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassAL;
-            iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassAL;
-            iirHighpassBL = (iirHighpassBL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassBL;
-            iirLowpassBL = (iirLowpassBL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassBL;
-            iirHighpassFL = (iirHighpassFL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassFL;
-            iirLowpassFL = (iirLowpassFL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassFL;
-            // iirHighpassAR = (iirHighpassAR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassAR;
-            // iirLowpassAR = (iirLowpassAR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassAR;
-            // iirHighpassBR = (iirHighpassBR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassBR;
-            // iirLowpassBR = (iirLowpassBR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassBR;
-            // iirHighpassFR = (iirHighpassFR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassFR;
-            // iirLowpassFR = (iirLowpassFR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassFR;
-            break;
-        case 3:
-            iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassAL;
-            iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassAL;
-            iirHighpassCL = (iirHighpassCL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassCL;
-            iirLowpassCL = (iirLowpassCL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassCL;
-            iirHighpassDL = (iirHighpassDL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassDL;
-            iirLowpassDL = (iirLowpassDL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassDL;
-            // iirHighpassAR = (iirHighpassAR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassAR;
-            // iirLowpassAR = (iirLowpassAR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassAR;
-            // iirHighpassCR = (iirHighpassCR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassCR;
-            // iirLowpassCR = (iirLowpassCR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassCR;
-            // iirHighpassDR = (iirHighpassDR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassDR;
-            // iirLowpassDR = (iirLowpassDR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassDR;
-            break;
-        case 4:
-            iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassAL;
-            iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassAL;
-            iirHighpassBL = (iirHighpassBL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassBL;
-            iirLowpassBL = (iirLowpassBL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassBL;
-            iirHighpassEL = (iirHighpassEL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassEL;
-            iirLowpassEL = (iirLowpassEL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassEL;
-            // iirHighpassAR = (iirHighpassAR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassAR;
-            // iirLowpassAR = (iirLowpassAR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassAR;
-            // iirHighpassBR = (iirHighpassBR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassBR;
-            // iirLowpassBR = (iirLowpassBR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassBR;
-            // iirHighpassER = (iirHighpassER * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassER;
-            // iirLowpassER = (iirLowpassER * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassER;
-            break;
-        case 5:
-            iirHighpassAL = (iirHighpassAL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassAL;
-            iirLowpassAL = (iirLowpassAL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassAL;
-            iirHighpassCL = (iirHighpassCL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassCL;
-            iirLowpassCL = (iirLowpassCL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassCL;
-            iirHighpassFL = (iirHighpassFL * invHighpass) + (inputSampleL * highpassAmount);
-            inputSampleL -= iirHighpassFL;
-            iirLowpassFL = (iirLowpassFL * invLowpass) + (inputSampleL * lowpassAmount);
-            inputSampleL = iirLowpassFL;
-            // iirHighpassAR = (iirHighpassAR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassAR;
-            // iirLowpassAR = (iirLowpassAR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassAR;
-            // iirHighpassCR = (iirHighpassCR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassCR;
-            // iirLowpassCR = (iirLowpassCR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassCR;
-            // iirHighpassFR = (iirHighpassFR * invHighpass) + (inputSampleR * highpassAmount);
-            // inputSampleR -= iirHighpassFR;
-            // iirLowpassFR = (iirLowpassFR * invLowpass) + (inputSampleR * lowpassAmount);
-            // inputSampleR = iirLowpassFR;
-            break;
-        }
-        //Highpass Filter chunk. This is three poles of IIR highpass, with a 'gearbox' that progressively
-        //steepens the filter after minimizing artifacts.
-
-        inputSampleL = (drySampleL * dry) + (inputSampleL * wet);
-        // inputSampleR = (drySampleR * dry) + (inputSampleR * wet);
-
-        //stereo 32 bit dither, made small and tidy.
-        int expon;
-        frexpf((float)inputSampleL, &expon);
-        long double dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
-        inputSampleL += (dither - fpNShapeL);
-        fpNShapeL = dither;
-        // frexpf((float)inputSampleR, &expon);
-        // dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
-        // inputSampleR += (dither - fpNShapeR);
-        // fpNShapeR = dither;
-        //end 32 bit dither
-
-        // output
-        outputs[OUT_OUTPUT].setVoltage(inputSampleL);
     }
 };
 

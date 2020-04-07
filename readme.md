@@ -2,7 +2,7 @@
 
 ![Rackwindows Modules](res/images/modules.jpg)
 
-NOTE: As of April 2020, this collection is still a work in progress and not yet ready for prime time. 
+NOTE: As of now, this collection is still a work in progress.
 
 Most of these modules are straight-up ports of [Airwindows](http://www.airwindows.com) plugins with the addition of a panel (designed to be potentially buildable in hardware) and the occasional tweak or enhancement here and there to take advantage of the modular environment.
 
@@ -16,19 +16,19 @@ See [LICENSE.md](LICENSE.md) for all licenses
 
 ## Modules
 
-- [Capacitor](#capacitor): Lowpass and highpass filters
+- [Capacitor Mono/Stereo](#capacitor): Filters
 - [Chorus](#chorus): Mono chorus with multi-tap option
 - [Dual BSG](#dual-bsg): Dual gain shifter
 - [Hombre](#hombre): Texas tone and texture
 - [MV](#mv): Dual-mono reverb
-- [Tape](#tape): All-purpose tape mojo
+- [Tremolo](#tremolo): Organic pulsating thing
 - [Vibrato](#vibrato): FM Vibrator o_O
 
 ## Capacitor <a id="capacitor"></a>
 
 ![Rackwindows Capacitor](res/images/capacitor.jpg)
 
-Description coming soon...
+Low- and highpass filters. Comes in both mono and stereo, with the stereo version featuring an additional dry/wet control.
 
 ## Chorus <a id="chorus"></a>
 
@@ -56,14 +56,20 @@ Description coming soon...
 
 Description coming soon...
 
-## Tape <a id="tape"></a>
+## Tremolo <a id="tremolo"></a>
 
-![Rackwindows Tape](res/images/tape.jpg)
+![Rackwindows Tremolo](res/images/tremolo.jpg)
 
-Description coming soon...
+Instead of volume animation Tremolo uses fluctuating saturation and antisaturation curves to create a more organic, somewhat tubey tremolo effect.
+
+More coming soon...
 
 ## Vibrato <a id="vibrato"></a>
 
 ![Rackwindows Vibrato](res/images/vibrato.jpg)
 
 Description coming soon...
+
+## Colophon
+
+The typeface used is Barlow by Jeremy Tribby

@@ -1,58 +1,109 @@
 {
   "slug": "rackwindows",
   "name": "Rackwindows",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "MIT",
   "brand": "Rackwindows",
   "author": "Jens Robert Janke",
   "authorEmail": "jensrobertjanke@gmail.com",
-  "authorUrl": "www.jensrobertjanke.com",
-  "pluginUrl": "",
-  "manualUrl": "",
-  "sourceUrl": "",
+  "authorUrl": "https://github.com/n0jo",
+  "pluginUrl": "https://github.com/n0jo/rackwindows",
+  "manualUrl": "https://github.com/n0jo/rackwindows/blob/master/README.md",
+  "sourceUrl": "https://github.com/n0jo/rackwindows.git",
   "donateUrl": "",
-  "changelogUrl": "",
-  "modules": [{
+  "changelogUrl": "https://github.com/n0jo/rackwindows/blob/master/CHANGELOG.md",
+  "modules": [
+    {
       "slug": "bitshiftgain",
       "name": "Dual BSG",
       "description": "Dual gain shifter",
-      "tags": ["Attenuator", "Dual", "Utility"]
+      "tags": [
+        "Attenuator",
+        "Dual",
+        "Utility"
+      ]
     },
     {
       "slug": "mv",
       "name": "MV",
       "description": "Dual-mono reverb",
-      "tags": ["Effect", "Reverb"]
-    },
-    {
-      "slug": "tape",
-      "name": "Tape",
-      "description": "All-purpose tape mojo",
-      "tags": ["Distortion", "Effect"]
+      "tags": [
+        "Effect",
+        "Reverb"
+      ]
     },
     {
       "slug": "vibrato",
       "name": "Vibrato",
       "description": "FM vibrator o_O",
-      "tags": ["Chorus", "Clock generator", "Effect", "Flanger", "Utility"]
+      "tags": [
+        "Chorus",
+        "Clock generator",
+        "Effect",
+        "Flanger",
+        "Utility"
+      ]
     },
     {
       "slug": "chorus",
       "name": "Chorus",
       "description": "Mono chorus with multi-tap option",
-      "tags": ["Chorus", "Delay", "Effect"]
+      "tags": [
+        "Chorus",
+        "Delay",
+        "Effect"
+      ]
     },
     {
       "slug": "hombre",
       "name": "Hombre",
       "description": "Texas tone and texture",
-      "tags": ["Distortion", "Effect"]
+      "tags": [
+        "Distortion",
+        "Effect"
+      ]
     },
     {
       "slug": "capacitor",
       "name": "Capacitor",
-      "description": "Filters",
-      "tags": ["Equalizer", "Filter"]
+      "description": "Filters (Mono)",
+      "tags": [
+        "Equalizer",
+        "Filter"
+      ]
+    },
+    {
+      "slug": "tremolo",
+      "name": "Tremolo",
+      "description": "Fluctuating saturation curves",
+      "tags": [
+        "Effect",
+        "Utility"
+      ]
+    },
+    {
+      "slug": "distance",
+      "name": "Distance",
+      "description": "",
+      "tags": [
+        "Effect",
+        "Utility"
+      ]
+    },
+    {
+      "slug": "capacitor_stereo",
+      "name": "Capacitor Stereo",
+      "description": "Filters (Stereo)",
+      "tags": [
+        "Equalizer",
+        "Filter"
+      ]
+    },
+    {
+      "slug": "electrohat",
+      "name": "ElectroHat",
+      "description": "",
+      "tags": []
     }
   ]
 }

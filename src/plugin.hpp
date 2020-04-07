@@ -11,8 +11,12 @@ extern Plugin* pluginInstance;
 // Declare each Model, defined in each module source file
 extern Model* modelBitshiftgain;
 extern Model* modelCapacitor;
+extern Model* modelCapacitor_stereo;
 extern Model* modelChorus;
+extern Model* modelDistance;
+extern Model* modelElectrohat;
 extern Model* modelHombre;
 extern Model* modelMv;
-extern Model* modelTape;
+// extern Model* modelTape;
+extern Model* modelTremolo;
 extern Model* modelVibrato;

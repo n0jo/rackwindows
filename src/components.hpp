@@ -103,6 +103,12 @@ struct RwSwitchKnobSmall : RwKnobSmall {
         snap = true;
     }
 };
+struct RwSwitchKnobSmallDark : RwKnobSmallDark {
+    RwSwitchKnobSmallDark()
+    {
+        snap = true;
+    }
+};
 
 // switches
 struct CKSSRot : SvgSwitch {

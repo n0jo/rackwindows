@@ -1,6 +1,6 @@
 /***********************************************************************************************
 MV
--------
+--
 VCV Rack module based on MV by Chris Johnson from Airwindows <www.airwindows.com>
 
 Ported and designed by Jens Robert Janke 

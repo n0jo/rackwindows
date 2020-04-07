@@ -1,6 +1,6 @@
 /***********************************************************************************************
 Dual BSG
--------
+--------
 VCV Rack module based on BitshiftGain by Chris Johnson from Airwindows <www.airwindows.com>
 
 Ported and designed by Jens Robert Janke 
