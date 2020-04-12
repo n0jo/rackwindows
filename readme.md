@@ -15,7 +15,7 @@ See [LICENSE.md](LICENSE.md) for all licenses
 ## Modules
 
 - [Capacitor Mono/Stereo](#capacitor): Filters
-- [Chorus](#chorus): Dual-mono chorus with multi-tap option
+- [Chorus](#chorus): Chorus with multi-tap option (Ensemble)
 - [Distance](#distance): Designed to mimic through-air high frequency attenuation
 - [Dual BSG](#dual-bsg): Dual gain shifter
 - [Hombre](#hombre): Texas tone and texture
@@ -31,7 +31,7 @@ Filters
 
 Comes in both mono and stereo, with the stereo version featuring an additional dry/wet control.
 
-[More information...](http://www.airwindows.com/capacitor)
+[More information](http://www.airwindows.com/capacitor)
 
 ## Chorus <a id="chorus"></a>
 
@@ -40,7 +40,7 @@ Chorus with multi-tap option (Ensemble)
 ![Rackwindows Chorus](res/images/chorus_panels.jpg)
 
 This surprisingly versatile module is a combination of Airwindows Chorus and ChorusEnsemble. The switch lets you toggle between the two flavours.
-[More information...](http://www.airwindows.com/chorus-vst)
+[More information](http://www.airwindows.com/chorus-vst)
 
 ## Distance <a id="distance"></a>
 
@@ -50,7 +50,7 @@ Designed to mimic through-air high frequency attenuation
 
 Pushes things back. Also quite nice on reverb returns.
 
-[More information...](http://www.airwindows.com/distance-vst)
+[More information](http://www.airwindows.com/distance-vst)
 
 ## Dual BSG <a id="dual-bsg"></a>
 
@@ -58,9 +58,9 @@ Dual gain shifter
 
 ![Rackwindows Dual BSG](res/images/dual_bsg_panels.jpg)
 
-Scales a signal up or down by increments of exactly 6 dB. If no input is connected, the respective output will provide constant voltage selectable in 1V steps from -8V to +8V. The lower section can be linked to the upper one to automatically compensate for values set by the upper 'Shift' knob, in which case the lower 'Shift' knob can be used to offset the signal in 6db steps (input connected) or 1V steps (input not connected). 
+Scales a signal up or down by increments of exactly 6 dB. If no input is connected, the respective output will provide constant voltage selectable in 1V steps from -8V to +8V. The lower section can be linked to the upper one to automatically compensate for values set by the upper 'Shift' knob. If linked the lower 'Shift' knob can be used to offset the signal in 6db steps (input connected) or 1V steps (input not connected). 
 
-[More information...](http://www.airwindows.com/bitshiftgain)
+[More information](http://www.airwindows.com/bitshiftgain)
 
 ## Hombre <a id="hombre"></a>
 
@@ -68,7 +68,7 @@ Texas tone and texture
 
 ![Rackwindows Hombre](res/images/hombre_panels.jpg)
 
-[More information...](http://www.airwindows.com/hombre-vst)
+[More information](http://www.airwindows.com/hombre-vst)
 
 ## MV <a id="mv"></a>
 
@@ -76,9 +76,9 @@ Dual-mono reverb
 
 ![Rackwindows MV](res/images/mv_panels.jpg)
 
-A reverb based on Bitshiftgain and old Alesis Midiverbs. Capable of turning everything into a pad or sustaining a 'bloom' forever. Watch your volume though when using small amounts of depth with full on regeneration.
+A reverb based on Bitshiftgain and old Alesis Midiverbs. Capable of turning everything into a pad or sustaining a 'bloom' forever. Watch your volume when using small amounts of depth with full on regeneration.
 
-[More information...](http://www.airwindows.com/mv)
+[More information](http://www.airwindows.com/mv)
 
 ## Tremolo <a id="tremolo"></a>
 
@@ -88,7 +88,7 @@ Organic pulsating thing
 
 Instead of volume animation Tremolo uses fluctuating saturation and antisaturation curves to create a more organic, somewhat tubey tremolo effect.
 
-[More information...](http://www.airwindows.com/tremolo-vst)
+[More information](http://www.airwindows.com/tremolo-vst)
 
 ## Vibrato <a id="vibrato"></a>
 
@@ -98,7 +98,7 @@ FM Vibrator o_O
 
 Make sure to also play with the 'Inverse/Wet' knob for chorusing and flange effects. Two trigger outputs have been added for fun.
 
-[More information...](http://www.airwindows.com/vibrato-vst)
+[More information](http://www.airwindows.com/vibrato-vst)
 
 ## Colophon
 
