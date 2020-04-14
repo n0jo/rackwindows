@@ -1,7 +1,7 @@
 {
   "slug": "rackwindows",
   "name": "Rackwindows",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "MIT",
   "brand": "Rackwindows",
   "author": "Jens Robert Janke",
@@ -59,12 +59,6 @@
         "Effect",
         "Utility"
       ]
-    },
-    {
-      "slug": "electrohat",
-      "name": "ElectroHat",
-      "description": "",
-      "tags": []
     },
     {
       "slug": "hombre",
