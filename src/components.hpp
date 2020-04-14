@@ -41,15 +41,6 @@ struct RwKnobMediumDark : app::SvgKnob {
         setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_knob_medium_dark.svg")));
     }
 };
-// struct RwKnobMediumAlt : app::SvgKnob {
-//     RwKnobMediumAlt()
-//     {
-//         minAngle = -0.76 * M_PI;
-//         maxAngle = 0.76 * M_PI;
-//         shadow->opacity = 0.1;
-//         setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_knob_medium_alt.svg")));
-//     }
-// };
 struct RwKnobSmall : app::SvgKnob {
     RwKnobSmall()
     {
@@ -111,11 +102,18 @@ struct RwSwitchKnobSmallDark : RwKnobSmallDark {
 };
 
 // switches
-struct CKSSRot : SvgSwitch {
-    CKSSRot()
+struct RwCKSS : SvgSwitch {
+    RwCKSS()
     {
-        addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/CKSS_rot_0.svg")));
-        addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/CKSS_rot_1.svg")));
+        addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_CKSS_0.svg")));
+        addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_CKSS_1.svg")));
+    }
+};
+struct RwCKSSRot : SvgSwitch {
+    RwCKSSRot()
+    {
+        addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_CKSS_rot_0.svg")));
+        addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_CKSS_rot_1.svg")));
     }
 };
 
