@@ -98,6 +98,10 @@ struct Chorus : Module {
 
     void process(const ProcessArgs& args) override
     {
+        // ensemble light
+        isEnsemble = params[ENSEMBLE_PARAM].getValue() ? true : false;
+        lights[ENSEMBLE_LIGHT].setBrightness(isEnsemble);
+
         if (outputs[OUT_L_OUTPUT].isConnected() || outputs[OUT_R_OUTPUT].isConnected()) {
 
             // params
@@ -110,10 +114,6 @@ struct Chorus : Module {
             B = clamp(B, 0.01f, 0.99f);
 
             C = params[DRYWET_PARAM].getValue();
-
-            // ensemble light
-            isEnsemble = params[ENSEMBLE_PARAM].getValue() ? true : false;
-            lights[ENSEMBLE_LIGHT].setBrightness(isEnsemble);
 
             // input
             float in1 = inputs[IN_L_INPUT].getVoltage();
@@ -375,7 +375,7 @@ struct ChorusWidget : ModuleWidget {
         addParam(createParamCentered<RwKnobMediumDark>(Vec(45.0, 185.0), module, Chorus::DRYWET_PARAM));
 
         // switches
-        addParam(createParamCentered<CKSS>(Vec(75.0, 155.0), module, Chorus::ENSEMBLE_PARAM));
+        addParam(createParamCentered<RwCKSS>(Vec(75.0, 155.0), module, Chorus::ENSEMBLE_PARAM));
 
         // lights
         addChild(createLightCentered<SmallLight<GreenLight>>(Vec(75, 136.8), module, Chorus::ENSEMBLE_LIGHT));
