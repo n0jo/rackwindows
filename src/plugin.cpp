@@ -12,10 +12,8 @@ void init(Plugin* p)
     p->addModel(modelCapacitor_stereo);
     p->addModel(modelChorus);
     p->addModel(modelDistance);
-    p->addModel(modelElectrohat);
     p->addModel(modelHombre);
     p->addModel(modelMv);
-    // p->addModel(modelTape);
     p->addModel(modelTremolo);
     p->addModel(modelVibrato);
 

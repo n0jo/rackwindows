@@ -40,6 +40,7 @@ Chorus with multi-tap option (Ensemble)
 ![Rackwindows Chorus](res/images/chorus_panels.jpg)
 
 This surprisingly versatile module is a combination of Airwindows Chorus and ChorusEnsemble. The switch lets you toggle between the two flavours.
+
 [More information](http://www.airwindows.com/chorus-vst)
 
 ## Distance <a id="distance"></a>
@@ -99,6 +100,10 @@ FM Vibrator o_O
 Make sure to also play with the 'Inverse/Wet' knob for chorusing and flange effects. Two trigger outputs have been added for fun.
 
 [More information](http://www.airwindows.com/vibrato-vst)
+
+## Building from Source
+
+To compile the modules from source, see the official [VCV Rack documentation](https://vcvrack.com/manual/Building.html).
 
 ## Colophon
 
