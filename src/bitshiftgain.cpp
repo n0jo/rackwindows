@@ -222,7 +222,7 @@ struct BitshiftgainWidget : ModuleWidget {
         addParam(createParamCentered<RwSwitchKnobMediumDark>(Vec(30.0, 235.0), module, Bitshiftgain::SHIFT2_PARAM));
 
         // switches
-        addParam(createParamCentered<CKSSRot>(Vec(30.0, 195.0), module, Bitshiftgain::LINK_PARAM));
+        addParam(createParamCentered<RwCKSSRot>(Vec(30.0, 195.0), module, Bitshiftgain::LINK_PARAM));
 
         // lights
         addChild(createLightCentered<SmallLight<GreenLight>>(Vec(48, 195), module, Bitshiftgain::LINK_LIGHT));
