@@ -13,6 +13,7 @@ extern Model* modelBitshiftgain;
 extern Model* modelCapacitor;
 extern Model* modelCapacitor_stereo;
 extern Model* modelChorus;
+extern Model* modelConsole;
 extern Model* modelDistance;
 extern Model* modelHombre;
 extern Model* modelMv;

@@ -11,6 +11,7 @@ void init(Plugin* p)
     p->addModel(modelCapacitor);
     p->addModel(modelCapacitor_stereo);
     p->addModel(modelChorus);
+    p->addModel(modelConsole);
     p->addModel(modelDistance);
     p->addModel(modelHombre);
     p->addModel(modelMv);

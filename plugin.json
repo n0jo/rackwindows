@@ -52,6 +52,12 @@
       ]
     },
     {
+      "slug": "console",
+      "name": "Console",
+      "description": "",
+      "tags": []
+    },
+    {
       "slug": "distance",
       "name": "Distance",
       "description": "",
