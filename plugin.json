@@ -61,12 +61,6 @@
       ]
     },
     {
-      "slug": "electrohat",
-      "name": "ElectroHat",
-      "description": "",
-      "tags": []
-    },
-    {
       "slug": "hombre",
       "name": "Hombre",
       "description": "Texas tone and texture",
@@ -82,6 +76,15 @@
       "tags": [
         "Effect",
         "Reverb"
+      ]
+    },
+    {
+      "slug": "tape",
+      "name": "Tape",
+      "description": "",
+      "tags": [
+        "Distortion",
+        "Effect"
       ]
     },
     {
