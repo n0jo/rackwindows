@@ -8,6 +8,7 @@ Ported and designed by Jens Robert Janke
 Changes/Additions:
 - console channel and buss combined into an 8-channel stereo summing mixer
 - no gain control
+- polyphonic
 
 Additional code heavily inspired by the Fundamental Mixer by Andrew Belt. 
 Some UI elements based on graphics from the Component Library by Wes Milholen. 

@@ -38,8 +38,8 @@ struct Tape : Module {
         NUM_LIGHTS
     };
 
-    const double gainCut = 0.1;
-    const double gainBoost = 10.0;
+    const double gainCut = 0.03125;
+    const double gainBoost = 32.0;
 
     double iirMidRollerAR;
     double iirMidRollerBR;
@@ -292,9 +292,6 @@ struct Tape : Module {
                     inputSample = -0.99;
                 //final iron bar
 
-                // bring gain back up
-                inputSample *= gainBoost;
-
                 //begin 32 bit stereo floating point dither
                 int expon;
                 frexpf((float)inputSample, &expon);
@@ -303,6 +300,9 @@ struct Tape : Module {
                 fpd ^= fpd << 5;
                 inputSample += ((double(fpd) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
                 //end 32 bit stereo floating point dither
+
+                // bring gain back up
+                inputSample *= gainBoost;
 
                 out[i] = inputSample;
             }
