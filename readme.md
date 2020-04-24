@@ -16,10 +16,12 @@ See [LICENSE.md](LICENSE.md) for all licenses
 
 - [Capacitor Mono/Stereo](#capacitor): Filters
 - [Chorus](#chorus): Chorus with multi-tap option (Ensemble)
+- [Console](#console): Stereo summing mixer
 - [Distance](#distance): Designed to mimic through-air high frequency attenuation
 - [Dual BSG](#dual-bsg): Dual gain shifter
 - [Hombre](#hombre): Texas tone and texture
 - [MV](#mv): Dual-mono reverb
+- [Tape](#tape): All-purpose tape mojo
 - [Tremolo](#tremolo): Organic pulsating thing
 - [Vibrato](#vibrato): FM Vibrator o_O
 
@@ -42,6 +44,16 @@ Chorus with multi-tap option (Ensemble)
 This surprisingly versatile module is a combination of Airwindows Chorus and ChorusEnsemble. The switch lets you toggle between the two flavours.
 
 [More information](http://www.airwindows.com/chorus-vst)
+
+## Console <a id="console"></a>
+
+![Rackwindows Console](res/images/console_panels.jpg)
+
+NOTE: Due to how the encoding/decoding works, spaciousness and definition will increase with each additional channel. There will be no effect on a single channel at all.
+
+Console sums signals in such a way where the resulting soundstage appears less flat, more spacious and more in line of what we know from analog mixing consoles. There are a number of variations/flavours of the Airwindows console concept and this module currently implements the most recent one, Console6. However I'm planning to make others selectable as well. Please check the link below for further information on how exactly this effect is achieved.
+
+[More information](http://www.airwindows.com/console2)
 
 ## Distance <a id="distance"></a>
 
@@ -80,6 +92,16 @@ Dual-mono reverb
 A reverb based on Bitshiftgain and old Alesis Midiverbs. Capable of turning everything into a pad or sustaining a 'bloom' forever. Watch your volume when using small amounts of depth with full on regeneration.
 
 [More information](http://www.airwindows.com/mv)
+
+## Tape <a id="tape"></a>
+
+All-purpose tape mojo
+
+![Rackwindows Tape](res/images/tape_panels.jpg)
+
+Tape is Airwindows' attempt to capture the very essence of what running audio through tape machines does to the signal. Driving it not only alters the volume, but also applies certain characteristics which are often associated with tape. The bump control allows to adjust the low end, e.g. in order to reign in excessive bass.
+
+[More information](http://www.airwindows.com/tape)
 
 ## Tremolo <a id="tremolo"></a>
 

@@ -1,3 +1,9 @@
+
+### 1.0.3 (24-04-2020)
+
+- New module: Tape
+- New module: Console
+
 ### 1.0.2 (13-04-2020)
 
 - Dual BSG: fixed switch graphic not rendering properly
