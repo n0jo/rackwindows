@@ -54,13 +54,13 @@
     {
       "slug": "console",
       "name": "Console",
-      "description": "",
-      "tags": []
+      "description": "Stereo summing mixer",
+      "tags": ["Mixer", "Utility"]
     },
     {
       "slug": "distance",
       "name": "Distance",
-      "description": "",
+      "description": "Far-away-izer",
       "tags": [
         "Effect",
         "Utility"
@@ -87,7 +87,7 @@
     {
       "slug": "tape",
       "name": "Tape",
-      "description": "",
+      "description": "All-purpose tape mojo",
       "tags": [
         "Distortion",
         "Effect"
