@@ -2,6 +2,8 @@
 
 ![Rackwindows Modules](res/images/rackwindows_panels.jpg)
 
+**NOTE**: As of now this set of modules is still a work in progress and subject to extensive testing. I invite every kind and willing soul to provide feedback and suggestions before I'll submit it to the library. Thanks!
+
 Most of these modules are straight-up ports of [Airwindows](http://www.airwindows.com) plugins with the addition of a panel (designed to be potentially buildable in hardware) and the occasional tweak or enhancement to take advantage of the modular environment.
 
 Airwindows plugins are known for exceptional sound quality, innovative approaches and minimalist interfaces. They often focus on and excel at one specific task, which is why I think they are a natural fit for Rack.
@@ -49,9 +51,9 @@ This surprisingly versatile module is a combination of Airwindows Chorus and Cho
 
 ![Rackwindows Console](res/images/console_panels.jpg)
 
-NOTE: Due to how the encoding/decoding works, spaciousness and definition will increase with each additional channel. There will be no effect on a single channel at all.
+Airwindows Console systems sum signals in a way where the resulting soundstage appears less flat, more spacious and more in line with what we are used to from analog mixers. There are a number of variations/flavours of the console concept and this module currently implements the most recent one, Console6. However I'm planning to make others selectable as well. Please check the link below for further information on how exactly this effect is achieved.
 
-Console sums signals in such a way where the resulting soundstage appears less flat, more spacious and more in line of what we know from analog mixing consoles. There are a number of variations/flavours of the Airwindows console concept and this module currently implements the most recent one, Console6. However I'm planning to make others selectable as well. Please check the link below for further information on how exactly this effect is achieved.
+**NOTE**: Due to how the encoding/decoding works, spaciousness and definition will increase with each additional channel. There will be **no** effect on a single channel at all.
 
 [More information](http://www.airwindows.com/console2)
 
@@ -99,7 +101,7 @@ All-purpose tape mojo
 
 ![Rackwindows Tape](res/images/tape_panels.jpg)
 
-Tape is Airwindows' attempt to capture the very essence of what running audio through tape machines does to the signal. Driving it not only alters the volume, but also applies certain characteristics which are often associated with tape. The bump control allows to adjust the low end, e.g. in order to reign in excessive bass.
+Tape is Airwindows' attempt to capture the very essence of what running audio through tape machines does to the signal. Driving it not only alters the volume, but also applies certain characteristics which are often associated with tape. The bump control allows to adjust the low end.
 
 [More information](http://www.airwindows.com/tape)
 
