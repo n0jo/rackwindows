@@ -23,8 +23,8 @@ struct Console : Module {
         NUM_PARAMS
     };
     enum InputIds {
-        ENUMS(IN_L_INPUTS, 8),
-        ENUMS(IN_R_INPUTS, 8),
+        ENUMS(IN_L_INPUTS, 9),
+        ENUMS(IN_R_INPUTS, 9),
         IN_ST_L_INPUT,
         IN_ST_R_INPUT,
         NUM_INPUTS
@@ -141,7 +141,7 @@ struct Console : Module {
             int maxChannelsR = 1;
 
             // for each mixer channel
-            for (int i = 0; i < 8; i++) {
+            for (int i = 0; i < 9; i++) {
 
                 // encode L
                 numChannelsL = inputs[IN_L_INPUTS + i].getChannels();
@@ -190,8 +190,10 @@ struct ConsoleWidget : ModuleWidget {
         addInput(createInputCentered<RwPJ301MPortSilver>(Vec(63.75, 235.0), module, Console::IN_R_INPUTS + 6));
         addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 265.0), module, Console::IN_L_INPUTS + 7));
         addInput(createInputCentered<RwPJ301MPortSilver>(Vec(63.75, 265.0), module, Console::IN_R_INPUTS + 7));
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 295.0), module, Console::IN_ST_L_INPUT));
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(63.75, 295.0), module, Console::IN_ST_R_INPUT));
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 295.0), module, Console::IN_L_INPUTS + 8));
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(63.75, 295.0), module, Console::IN_R_INPUTS + 8));
+        // addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 295.0), module, Console::IN_ST_L_INPUT));
+        // addInput(createInputCentered<RwPJ301MPortSilver>(Vec(63.75, 295.0), module, Console::IN_ST_R_INPUT));
 
         addOutput(createOutputCentered<RwPJ301MPort>(Vec(26.25, 325.0), module, Console::OUT_L_OUTPUT));
         addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.75, 325.0), module, Console::OUT_R_OUTPUT));
