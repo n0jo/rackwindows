@@ -192,8 +192,6 @@ struct ConsoleWidget : ModuleWidget {
         addInput(createInputCentered<RwPJ301MPortSilver>(Vec(63.75, 265.0), module, Console::IN_R_INPUTS + 7));
         addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 295.0), module, Console::IN_L_INPUTS + 8));
         addInput(createInputCentered<RwPJ301MPortSilver>(Vec(63.75, 295.0), module, Console::IN_R_INPUTS + 8));
-        // addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 295.0), module, Console::IN_ST_L_INPUT));
-        // addInput(createInputCentered<RwPJ301MPortSilver>(Vec(63.75, 295.0), module, Console::IN_ST_R_INPUT));
 
         addOutput(createOutputCentered<RwPJ301MPort>(Vec(26.25, 325.0), module, Console::OUT_L_OUTPUT));
         addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.75, 325.0), module, Console::OUT_R_OUTPUT));
