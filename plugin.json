@@ -44,11 +44,12 @@
     {
       "slug": "chorus",
       "name": "Chorus",
-      "description": "Dual-mono chorus with multi-tap option",
+      "description": "Stereo chorus with multi-tap option",
       "tags": [
         "Chorus",
         "Delay",
-        "Effect"
+        "Effect",
+        "Polyphonic"
       ]
     },
     {

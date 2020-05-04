@@ -6,9 +6,9 @@ VCV Rack module based on Chorus by Chris Johnson from Airwindows <www.airwindows
 Ported and designed by Jens Robert Janke 
 
 Changes/Additions:
-- stereo wtf? needs redesign, as Chorus is apparently mono
 - ensemble switch: changes behaviour to ChorusEnsemble
-- CV inputs for speed, range and dry/wet
+- CV inputs for speed and range
+- polyphonic
 
 Some UI elements based on graphics from the Component Library by Wes Milholen. 
 
@@ -42,29 +42,34 @@ struct Chorus : Module {
         NUM_LIGHTS
     };
 
-    long double fpNShapeL;
-    long double fpNShapeR;
-    //default stuff
+    const double gainCut = 0.03125;
+    const double gainBoost = 32.0;
+
+    bool isEnsemble;
+
+    // global variables for potentially 16 poly channels
     const static int totalsamples = 16386;
-    float dL[totalsamples];
-    float dR[totalsamples];
-    double sweep;
-    int gcount;
-    double airPrevL;
-    double airEvenL;
-    double airOddL;
-    double airFactorL;
-    double airPrevR;
-    double airEvenR;
-    double airOddR;
-    double airFactorR;
-    bool fpFlip;
+    float d[16][totalsamples];
+    double sweepL[16];
+    double sweepR[16];
+    int gcountL[16];
+    int gcountR[16];
+    double airPrevL[16];
+    double airEvenL[16];
+    double airOddL[16];
+    double airFactorL[16];
+    double airPrevR[16];
+    double airEvenR[16];
+    double airOddR[16];
+    double airFactorR[16];
+    bool fpFlipL[16];
+    bool fpFlipR[16];
+    long double fpNShapeL[16];
+    long double fpNShapeR[16];
 
     float A;
     float B;
     float C;
-
-    bool isEnsemble;
 
     Chorus()
     {
@@ -74,54 +79,39 @@ struct Chorus : Module {
         configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
         configParam(ENSEMBLE_PARAM, 0.f, 1.f, 0.f, "Ensemble");
 
-        for (int count = 0; count < totalsamples - 1; count++) {
-            dL[count] = 0;
-            dR[count] = 0;
-        }
-        sweep = 3.141592653589793238 / 2.0;
-        gcount = 0;
-        airPrevL = 0.0;
-        airEvenL = 0.0;
-        airOddL = 0.0;
-        airFactorL = 0.0;
-        airPrevR = 0.0;
-        airEvenR = 0.0;
-        airOddR = 0.0;
-        airFactorR = 0.0;
-        fpFlip = true;
-        fpNShapeL = 0.0;
-        fpNShapeR = 0.0;
-        //this is reset: values being initialized only once. Startup values, whatever they are.
-
         isEnsemble = false;
+
+        for (int i = 0; i < 16; i++) {
+            for (int count = 0; count < totalsamples - 1; count++) {
+                d[i][count] = 0;
+            }
+            sweepL[i] = 3.141592653589793238 / 2.0;
+            sweepR[i] = 3.141592653589793238 / 2.0;
+            gcountL[i] = 0;
+            gcountR[i] = 0;
+            airPrevL[i] = 0.0;
+            airPrevR[i] = 0.0;
+            airEvenL[i] = 0.0;
+            airEvenR[i] = 0.0;
+            airOddL[i] = 0.0;
+            airOddR[i] = 0.0;
+            airFactorL[i] = 0.0;
+            airFactorR[i] = 0.0;
+            fpFlipL[i] = true;
+            fpFlipR[i] = true;
+            fpNShapeL[i] = 0.0;
+            fpNShapeR[i] = 0.0;
+        }
+        //this is reset: values being initialized only once. Startup values, whatever they are.
     }
 
-    void process(const ProcessArgs& args) override
+    void processChannel(Input& input, Output& output, float A, float B, float C, float sampleRate, double sweep[], int gcount[], double airPrev[], double airEven[], double airOdd[], double airFactor[], bool fpFlip[], long double fpNShape[])
     {
-        // ensemble light
-        isEnsemble = params[ENSEMBLE_PARAM].getValue() ? true : false;
-        lights[ENSEMBLE_LIGHT].setBrightness(isEnsemble);
-
-        if (outputs[OUT_L_OUTPUT].isConnected() || outputs[OUT_R_OUTPUT].isConnected()) {
-
-            // params
-            A = params[SPEED_PARAM].getValue();
-            A += inputs[SPEED_CV_INPUT].getVoltage() / 5;
-            A = clamp(A, 0.01f, 0.99f);
-
-            B = params[RANGE_PARAM].getValue();
-            B += inputs[RANGE_CV_INPUT].getVoltage() / 5;
-            B = clamp(B, 0.01f, 0.99f);
-
-            C = params[DRYWET_PARAM].getValue();
-
-            // input
-            float in1 = inputs[IN_L_INPUT].getVoltage();
-            float in2 = inputs[IN_R_INPUT].getVoltage();
+        if (input.isConnected()) {
 
             double overallscale = 1.0;
             overallscale /= 44100.0;
-            overallscale *= args.sampleRate;
+            overallscale *= sampleRate;
 
             double speed = 0.0;
             double range = 0.0;
@@ -151,209 +141,170 @@ struct Chorus : Module {
             double offset;
             //this is a double buffer so we will be splitting it in two
 
-            long double inputSampleL;
-            long double inputSampleR;
-            double drySampleL;
-            double drySampleR;
+            double drySample;
 
             speed *= overallscale;
 
-            inputSampleL = in1;
-            inputSampleR = in2;
+            // input
+            int numChannels = input.getChannels();
 
-            if (inputSampleL < 1.2e-38 && -inputSampleL < 1.2e-38) {
-                static int noisesource = 0;
-                //this declares a variable before anything else is compiled. It won't keep assigning
-                //it to 0 for every sample, it's as if the declaration doesn't exist in this context,
-                //but it lets me add this denormalization fix in a single place rather than updating
-                //it in three different locations. The variable isn't thread-safe but this is only
-                //a random seed and we can share it with whatever.
-                noisesource = noisesource % 1700021;
-                noisesource++;
-                int residue = noisesource * noisesource;
-                residue = residue % 170003;
-                residue *= residue;
-                residue = residue % 17011;
-                residue *= residue;
-                residue = residue % 1709;
-                residue *= residue;
-                residue = residue % 173;
-                residue *= residue;
-                residue = residue % 17;
-                double applyresidue = residue;
-                applyresidue *= 0.00000001;
-                applyresidue *= 0.00000001;
-                inputSampleL = applyresidue;
+            // for each poly channel
+            for (int i = 0; i < numChannels; i++) {
+
+                // input
+                long double inputSample = input.getPolyVoltage(i);
+
+                // pad gain
+                inputSample *= gainCut;
+
+                if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
+                    static int noisesource = 0;
+                    //this declares a variable before anything else is compiled. It won't keep assigning
+                    //it to 0 for every sample, it's as if the declaration doesn't exist in this context,
+                    //but it lets me add this denormalization fix in a single place rather than updating
+                    //it in three different locations. The variable isn't thread-safe but this is only
+                    //a random seed and we can share it with whatever.
+                    noisesource = noisesource % 1700021;
+                    noisesource++;
+                    int residue = noisesource * noisesource;
+                    residue = residue % 170003;
+                    residue *= residue;
+                    residue = residue % 17011;
+                    residue *= residue;
+                    residue = residue % 1709;
+                    residue *= residue;
+                    residue = residue % 173;
+                    residue *= residue;
+                    residue = residue % 17;
+                    double applyresidue = residue;
+                    applyresidue *= 0.00000001;
+                    applyresidue *= 0.00000001;
+                    inputSample = applyresidue;
+                }
+                drySample = inputSample;
+
+                airFactor[i] = airPrev[i] - inputSample;
+                if (fpFlip[i]) {
+                    airEven[i] += airFactor[i];
+                    airOdd[i] -= airFactor[i];
+                    airFactor[i] = airEven[i];
+                } else {
+                    airOdd[i] += airFactor[i];
+                    airEven[i] -= airFactor[i];
+                    airFactor[i] = airOdd[i];
+                }
+                airOdd[i] = (airOdd[i] - ((airOdd[i] - airEven[i]) / 256.0)) / 1.0001;
+                airEven[i] = (airEven[i] - ((airEven[i] - airOdd[i]) / 256.0)) / 1.0001;
+                airPrev[i] = inputSample;
+                inputSample += (airFactor[i] * wet);
+                //air, compensates for loss of highs in flanger's interpolation
+
+                if (gcount[i] < 1 || gcount[i] > loopLimit) {
+                    gcount[i] = loopLimit;
+                }
+                count = gcount[i];
+                d[i][count + loopLimit] = d[i][count] = inputSample;
+                gcount[i]--;
+                //double buffer
+
+                if (isEnsemble) {
+                    offset = start[0] + (modulation * sin(sweep[i]));
+                    count = gcount[i] + (int)floor(offset);
+
+                    inputSample = d[i][count] * (1 - (offset - floor(offset))); //less as value moves away from .0
+                    inputSample += d[i][count + 1]; //we can assume always using this in one way or another?
+                    inputSample += (d[i][count + 2] * (offset - floor(offset))); //greater as value moves away from .0
+                    inputSample -= (((d[i][count] - d[i][count + 1]) - (d[i][count + 1] - d[i][count + 2])) / 50); //interpolation hacks 'r us
+
+                    offset = start[1] + (modulation * sin(sweep[i] + 1.0));
+                    count = gcount[i] + (int)floor(offset);
+                    inputSample += d[i][count] * (1 - (offset - floor(offset))); //less as value moves away from .0
+                    inputSample += d[i][count + 1]; //we can assume always using this in one way or another?
+                    inputSample += (d[i][count + 2] * (offset - floor(offset))); //greater as value moves away from .0
+                    inputSample -= (((d[i][count] - d[i][count + 1]) - (d[i][count + 1] - d[i][count + 2])) / 50); //interpolation hacks 'r us
+
+                    offset = start[2] + (modulation * sin(sweep[i] + 2.0));
+                    count = gcount[i] + (int)floor(offset);
+                    inputSample += d[i][count] * (1 - (offset - floor(offset))); //less as value moves away from .0
+                    inputSample += d[i][count + 1]; //we can assume always using this in one way or another?
+                    inputSample += (d[i][count + 2] * (offset - floor(offset))); //greater as value moves away from .0
+                    inputSample -= (((d[i][count] - d[i][count + 1]) - (d[i][count + 1] - d[i][count + 2])) / 50); //interpolation hacks 'r us
+
+                    offset = start[3] + (modulation * sin(sweep[i] + 3.0));
+                    count = gcount[i] + (int)floor(offset);
+                    inputSample += d[i][count] * (1 - (offset - floor(offset))); //less as value moves away from .0
+                    inputSample += d[i][count + 1]; //we can assume always using this in one way or another?
+                    inputSample += (d[i][count + 2] * (offset - floor(offset))); //greater as value moves away from .0
+                    inputSample -= (((d[i][count] - d[i][count + 1]) - (d[i][count + 1] - d[i][count + 2])) / 50); //interpolation hacks 'r us
+
+                    inputSample *= 0.25; // to get a comparable level
+
+                } else {
+
+                    offset = range + (modulation * sin(sweep[i]));
+                    count += (int)floor(offset);
+
+                    inputSample = d[i][count] * (1 - (offset - floor(offset))); //less as value moves away from .0
+                    inputSample += d[i][count + 1]; //we can assume always using this in one way or another?
+                    inputSample += (d[i][count + 2] * (offset - floor(offset))); //greater as value moves away from .0
+                    inputSample -= (((d[i][count] - d[i][count + 1]) - (d[i][count + 1] - d[i][count + 2])) / 50); //interpolation hacks 'r us
+
+                    inputSample *= 0.5; // to get a comparable level
+                    //sliding
+                }
+
+                sweep[i] += speed;
+                if (sweep[i] > tupi) {
+                    sweep[i] -= tupi;
+                }
+                //still scrolling through the samples, remember
+
+                if (wet != 1.0) {
+                    inputSample = (inputSample * wet) + (drySample * dry);
+                }
+                fpFlip[i] = !fpFlip[i];
+
+                //stereo 32 bit dither, made small and tidy.
+                int expon;
+                frexpf((float)inputSample, &expon);
+                long double dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
+                inputSample += (dither - fpNShape[i]);
+                fpNShape[i] = dither;
+                //end 32 bit dither
+
+                // bring gain back up
+                inputSample *= gainBoost;
+
+                // output
+                output.setChannels(numChannels);
+                output.setVoltage(inputSample, i);
             }
-            if (inputSampleR < 1.2e-38 && -inputSampleR < 1.2e-38) {
-                static int noisesource = 0;
-                noisesource = noisesource % 1700021;
-                noisesource++;
-                int residue = noisesource * noisesource;
-                residue = residue % 170003;
-                residue *= residue;
-                residue = residue % 17011;
-                residue *= residue;
-                residue = residue % 1709;
-                residue *= residue;
-                residue = residue % 173;
-                residue *= residue;
-                residue = residue % 17;
-                double applyresidue = residue;
-                applyresidue *= 0.00000001;
-                applyresidue *= 0.00000001;
-                inputSampleR = applyresidue;
-                //this denormalization routine produces a white noise at -300 dB which the noise
-                //shaping will interact with to produce a bipolar output, but the noise is actually
-                //all positive. That should stop any variables from going denormal, and the routine
-                //only kicks in if digital black is input. As a final touch, if you save to 24-bit
-                //the silence will return to being digital black again.
-            }
-            drySampleL = inputSampleL;
-            drySampleR = inputSampleR;
-
-            airFactorL = airPrevL - inputSampleL;
-            if (fpFlip) {
-                airEvenL += airFactorL;
-                airOddL -= airFactorL;
-                airFactorL = airEvenL;
-            } else {
-                airOddL += airFactorL;
-                airEvenL -= airFactorL;
-                airFactorL = airOddL;
-            }
-            airOddL = (airOddL - ((airOddL - airEvenL) / 256.0)) / 1.0001;
-            airEvenL = (airEvenL - ((airEvenL - airOddL) / 256.0)) / 1.0001;
-            airPrevL = inputSampleL;
-            inputSampleL += (airFactorL * wet);
-            //air, compensates for loss of highs in flanger's interpolation
-
-            airFactorR = airPrevR - inputSampleR;
-            if (fpFlip) {
-                airEvenR += airFactorR;
-                airOddR -= airFactorR;
-                airFactorR = airEvenR;
-            } else {
-                airOddR += airFactorR;
-                airEvenR -= airFactorR;
-                airFactorR = airOddR;
-            }
-            airOddR = (airOddR - ((airOddR - airEvenR) / 256.0)) / 1.0001;
-            airEvenR = (airEvenR - ((airEvenR - airOddR) / 256.0)) / 1.0001;
-            airPrevR = inputSampleR;
-            inputSampleR += (airFactorR * wet);
-            //air, compensates for loss of highs in flanger's interpolation
-
-            if (gcount < 1 || gcount > loopLimit) {
-                gcount = loopLimit;
-            }
-            count = gcount;
-            dL[count + loopLimit] = dL[count] = inputSampleL;
-            dR[count + loopLimit] = dR[count] = inputSampleR;
-            gcount--;
-            //double buffer
-
-            if (isEnsemble) {
-                offset = start[0] + (modulation * sin(sweep));
-                count = gcount + (int)floor(offset);
-
-                inputSampleL = dL[count] * (1 - (offset - floor(offset))); //less as value moves away from .0
-                inputSampleL += dL[count + 1]; //we can assume always using this in one way or another?
-                inputSampleL += (dL[count + 2] * (offset - floor(offset))); //greater as value moves away from .0
-                inputSampleL -= (((dL[count] - dL[count + 1]) - (dL[count + 1] - dL[count + 2])) / 50); //interpolation hacks 'r us
-
-                inputSampleR = dR[count] * (1 - (offset - floor(offset))); //less as value moves away from .0
-                inputSampleR += dR[count + 1]; //we can assume always using this in one way or another?
-                inputSampleR += (dR[count + 2] * (offset - floor(offset))); //greater as value moves away from .0
-                inputSampleR -= (((dR[count] - dR[count + 1]) - (dR[count + 1] - dR[count + 2])) / 50); //interpolation hacks 'r us
-
-                offset = start[1] + (modulation * sin(sweep + 1.0));
-                count = gcount + (int)floor(offset);
-                inputSampleL += dL[count] * (1 - (offset - floor(offset))); //less as value moves away from .0
-                inputSampleL += dL[count + 1]; //we can assume always using this in one way or another?
-                inputSampleL += (dL[count + 2] * (offset - floor(offset))); //greater as value moves away from .0
-                inputSampleL -= (((dL[count] - dL[count + 1]) - (dL[count + 1] - dL[count + 2])) / 50); //interpolation hacks 'r us
-
-                inputSampleR += dR[count] * (1 - (offset - floor(offset))); //less as value moves away from .0
-                inputSampleR += dR[count + 1]; //we can assume always using this in one way or another?
-                inputSampleR += (dR[count + 2] * (offset - floor(offset))); //greater as value moves away from .0
-                inputSampleR -= (((dR[count] - dR[count + 1]) - (dR[count + 1] - dR[count + 2])) / 50); //interpolation hacks 'r us
-
-                offset = start[2] + (modulation * sin(sweep + 2.0));
-                count = gcount + (int)floor(offset);
-                inputSampleL += dL[count] * (1 - (offset - floor(offset))); //less as value moves away from .0
-                inputSampleL += dL[count + 1]; //we can assume always using this in one way or another?
-                inputSampleL += (dL[count + 2] * (offset - floor(offset))); //greater as value moves away from .0
-                inputSampleL -= (((dL[count] - dL[count + 1]) - (dL[count + 1] - dL[count + 2])) / 50); //interpolation hacks 'r us
-
-                inputSampleR += dR[count] * (1 - (offset - floor(offset))); //less as value moves away from .0
-                inputSampleR += dR[count + 1]; //we can assume always using this in one way or another?
-                inputSampleR += (dR[count + 2] * (offset - floor(offset))); //greater as value moves away from .0
-                inputSampleR -= (((dR[count] - dR[count + 1]) - (dR[count + 1] - dR[count + 2])) / 50); //interpolation hacks 'r us
-
-                offset = start[3] + (modulation * sin(sweep + 3.0));
-                count = gcount + (int)floor(offset);
-                inputSampleL += dL[count] * (1 - (offset - floor(offset))); //less as value moves away from .0
-                inputSampleL += dL[count + 1]; //we can assume always using this in one way or another?
-                inputSampleL += (dL[count + 2] * (offset - floor(offset))); //greater as value moves away from .0
-                inputSampleL -= (((dL[count] - dL[count + 1]) - (dL[count + 1] - dL[count + 2])) / 50); //interpolation hacks 'r us
-
-                inputSampleR += dR[count] * (1 - (offset - floor(offset))); //less as value moves away from .0
-                inputSampleR += dR[count + 1]; //we can assume always using this in one way or another?
-                inputSampleR += (dR[count + 2] * (offset - floor(offset))); //greater as value moves away from .0
-                inputSampleR -= (((dR[count] - dR[count + 1]) - (dR[count + 1] - dR[count + 2])) / 50); //interpolation hacks 'r us
-
-                inputSampleL *= 0.125; //to get a comparable level
-                inputSampleR *= 0.125; //to get a comparable level
-
-            } else {
-
-                offset = range + (modulation * sin(sweep));
-                count += (int)floor(offset);
-
-                inputSampleL = dL[count] * (1 - (offset - floor(offset))); //less as value moves away from .0
-                inputSampleL += dL[count + 1]; //we can assume always using this in one way or another?
-                inputSampleL += (dL[count + 2] * (offset - floor(offset))); //greater as value moves away from .0
-                inputSampleL -= (((dL[count] - dL[count + 1]) - (dL[count + 1] - dL[count + 2])) / 50); //interpolation hacks 'r us
-
-                inputSampleR = dR[count] * (1 - (offset - floor(offset))); //less as value moves away from .0
-                inputSampleR += dR[count + 1]; //we can assume always using this in one way or another?
-                inputSampleR += (dR[count + 2] * (offset - floor(offset))); //greater as value moves away from .0
-                inputSampleR -= (((dR[count] - dR[count + 1]) - (dR[count + 1] - dR[count + 2])) / 50); //interpolation hacks 'r us
-
-                inputSampleL *= 0.5; //to get a comparable level
-                inputSampleR *= 0.5; //to get a comparable level
-                //sliding
-            }
-
-            sweep += speed;
-            if (sweep > tupi) {
-                sweep -= tupi;
-            }
-            //still scrolling through the samples, remember
-
-            if (wet != 1.0) {
-                inputSampleL = (inputSampleL * wet) + (drySampleL * dry);
-                inputSampleR = (inputSampleR * wet) + (drySampleR * dry);
-            }
-            fpFlip = !fpFlip;
-
-            //stereo 32 bit dither, made small and tidy.
-            int expon;
-            frexpf((float)inputSampleL, &expon);
-            long double dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
-            inputSampleL += (dither - fpNShapeL);
-            fpNShapeL = dither;
-            frexpf((float)inputSampleR, &expon);
-            dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
-            inputSampleR += (dither - fpNShapeR);
-            fpNShapeR = dither;
-            //end 32 bit dither
-
-            // output
-            outputs[OUT_L_OUTPUT].setVoltage(inputSampleL);
-            outputs[OUT_R_OUTPUT].setVoltage(inputSampleR);
         }
+    }
+    void process(const ProcessArgs& args) override
+    {
+        if (outputs[OUT_L_OUTPUT].isConnected() || outputs[OUT_R_OUTPUT].isConnected()) {
+
+            // params
+            A = params[SPEED_PARAM].getValue();
+            A += inputs[SPEED_CV_INPUT].getVoltage() / 5;
+            A = clamp(A, 0.01f, 0.99f);
+
+            B = params[RANGE_PARAM].getValue();
+            B += inputs[RANGE_CV_INPUT].getVoltage() / 5;
+            B = clamp(B, 0.01f, 0.99f);
+
+            C = params[DRYWET_PARAM].getValue();
+
+            // process L
+            processChannel(inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT], A, B, C, args.sampleRate, sweepL, gcountL, airPrevL, airEvenL, airOddL, airFactorL, fpFlipL, fpNShapeL);
+            // process R
+            processChannel(inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT], A, B, C, args.sampleRate, sweepR, gcountR, airPrevR, airEvenR, airOddR, airFactorR, fpFlipR, fpNShapeR);
+        }
+
+        // ensemble light
+        isEnsemble = params[ENSEMBLE_PARAM].getValue() ? true : false;
+        lights[ENSEMBLE_LIGHT].setBrightness(isEnsemble);
     }
 };
 
