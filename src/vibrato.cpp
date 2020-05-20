@@ -5,6 +5,11 @@ VCV Rack module based on Vibrato by Chris Johnson from Airwindows <www.airwindow
 
 Ported and designed by Jens Robert Janke 
 
+Changes/Additions:
+- CV inputs for speed, depth, fmspeed, fmdepth and inv/wet 
+- trigger outputs (EOC) for speed and fmspeed
+- polyphonic
+
 Some UI elements based on graphics from the Component Library by Wes Milholen. 
 
 See ./LICENSE.md for all licenses
@@ -43,19 +48,22 @@ struct Vibrato : Module {
         NUM_LIGHTS
     };
 
-    double pL[16386]; //this is processed, not raw incoming samples
-    double sweep;
-    double sweepB;
-    int gcount;
+    const double gainCut = 0.03125;
+    const double gainBoost = 32.0;
 
-    double airPrevL;
-    double airEvenL;
-    double airOddL;
-    double airFactorL;
+    double p[16][16386]; //this is processed, not raw incoming samples
+    double sweep[16];
+    double sweepB[16];
+    int gcount[16];
 
-    bool flip;
-    uint32_t fpd;
-    //default stuff
+    double airPrev[16];
+    double airEven[16];
+    double airOdd[16];
+    double airFactor[16];
+
+    bool flip[16];
+
+    uint32_t fpd[16];
 
     float A;
     float B;
@@ -83,22 +91,22 @@ struct Vibrato : Module {
         configParam(FMDEPTH_PARAM, 0.f, 1.f, 0.f, "FM Depth");
         configParam(INVWET_PARAM, 0.f, 1.f, 0.5f, "Inv/Wet");
 
-        for (int count = 0; count < 16385; count++) {
-            pL[count] = 0.0;
+        for (int i = 0; i < 16; i++) {
+            for (int count = 0; count < 16385; count++) {
+                p[i][count] = 0.0;
+            }
+            sweep[i] = sweepB[i] = 3.141592653589793238 / 2.0;
+            gcount[i] = 0;
+
+            airPrev[i] = 0.0;
+            airEven[i] = 0.0;
+            airOdd[i] = 0.0;
+            airFactor[i] = 0.0;
+
+            flip[i] = false;
+
+            fpd[i] = 17;
         }
-        sweep = 3.141592653589793238 / 2.0;
-        sweepB = 3.141592653589793238 / 2.0;
-        gcount = 0;
-
-        airPrevL = 0.0;
-        airEvenL = 0.0;
-        airOddL = 0.0;
-        airFactorL = 0.0;
-
-        flip = false;
-
-        fpd = 17;
-        //this is reset: values being initialized only once. Startup values, whatever they are.
     }
 
     void process(const ProcessArgs& args) override
@@ -125,8 +133,6 @@ struct Vibrato : Module {
             E += inputs[INVWET_CV_INPUT].getVoltage() / 5;
             E = clamp(E, 0.01f, 0.99f);
 
-            float in1 = inputs[IN_INPUT].getVoltage();
-
             double speed = pow(0.1 + A, 6);
             double depth = (pow(B, 3) / sqrt(speed)) * 4.0;
             double speedB = pow(0.1 + C, 6);
@@ -134,88 +140,107 @@ struct Vibrato : Module {
             double tupi = 3.141592653589793238 * 2.0;
             double wet = (E * 2.0) - 1.0; //note: inv/dry/wet
 
-            long double inputSampleL = in1;
-            if (fabs(inputSampleL) < 1.18e-37)
-                inputSampleL = fpd * 1.18e-37;
-            double drySampleL = inputSampleL;
+            // number of polyphonic channels
+            int numChannels = inputs[IN_INPUT].getChannels();
 
-            airFactorL = airPrevL - inputSampleL;
+            // for each poly channel
+            for (int i = 0; i < numChannels; i++) {
 
-            if (flip) {
-                airEvenL += airFactorL;
-                airOddL -= airFactorL;
-                airFactorL = airEvenL;
-            } else {
-                airOddL += airFactorL;
-                airEvenL -= airFactorL;
-                airFactorL = airOddL;
+                // input
+                long double inputSample = inputs[IN_INPUT].getPolyVoltage(i);
+
+                // pad gain
+                inputSample *= gainCut;
+
+                if (fabs(inputSample) < 1.18e-37)
+                    inputSample = fpd[i] * 1.18e-37;
+
+                double drySample = inputSample;
+
+                airFactor[i] = airPrev[i] - inputSample;
+
+                if (flip[i]) {
+                    airEven[i] += airFactor[i];
+                    airOdd[i] -= airFactor[i];
+                    airFactor[i] = airEven[i];
+                } else {
+                    airOdd[i] += airFactor[i];
+                    airEven[i] -= airFactor[i];
+                    airFactor[i] = airOdd[i];
+                }
+
+                //air, compensates for loss of highs in the interpolation
+                airOdd[i] = (airOdd[i] - ((airOdd[i] - airEven[i]) / 256.0)) / 1.0001;
+                airEven[i] = (airEven[i] - ((airEven[i] - airOdd[i]) / 256.0)) / 1.0001;
+                airPrev[i] = inputSample;
+                inputSample += airFactor[i];
+
+                flip[i] = !flip[i];
+
+                if (gcount[i] < 1 || gcount[i] > 8192) {
+                    gcount[i] = 8192;
+                }
+                int count = gcount[i];
+                p[i][count + 8192] = p[i][count] = inputSample;
+
+                double offset = depth + (depth * sin(sweep[i]));
+                count += (int)floor(offset);
+
+                inputSample = p[i][count] * (1.0 - (offset - floor(offset))); //less as value moves away from .0
+                inputSample += p[i][count + 1]; //we can assume always using this in one way or another?
+                inputSample += p[i][count + 2] * (offset - floor(offset)); //greater as value moves away from .0
+                inputSample -= ((p[i][count] - p[i][count + 1]) - (p[i][count + 1] - p[i][count + 2])) / 50.0; //interpolation hacks 'r us
+                inputSample *= 0.5; // gain trim
+
+                //still scrolling through the samples, remember
+                sweep[i] += (speed + (speedB * sin(sweepB[i]) * depthB));
+                sweepB[i] += speedB;
+                if (sweep[i] > tupi) {
+                    sweep[i] -= tupi;
+                }
+                if (sweep[i] < 0.0) {
+                    sweep[i] += tupi;
+                } //through zero FM
+                if (sweepB[i] > tupi) {
+                    sweepB[i] -= tupi;
+                }
+                gcount[i]--;
+
+                //Inv/Dry/Wet control
+                if (wet != 1.0) {
+                    inputSample = (inputSample * wet) + (drySample * (1.0 - fabs(wet)));
+                }
+
+                //begin 32 bit stereo floating point dither
+                int expon;
+                frexpf((float)inputSample, &expon);
+                fpd[i] ^= fpd[i] << 13;
+                fpd[i] ^= fpd[i] >> 17;
+                fpd[i] ^= fpd[i] << 5;
+                inputSample += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
+                //end 32 bit stereo floating point dither
+
+                // bring gain back up
+                inputSample *= gainBoost;
+
+                // audio output
+                outputs[OUT_OUTPUT].setChannels(numChannels);
+                outputs[OUT_OUTPUT].setVoltage(inputSample, i);
             }
-
-            airOddL = (airOddL - ((airOddL - airEvenL) / 256.0)) / 1.0001;
-            airEvenL = (airEvenL - ((airEvenL - airOddL) / 256.0)) / 1.0001;
-            airPrevL = inputSampleL;
-            inputSampleL += airFactorL;
-
-            flip = !flip;
-            //air, compensates for loss of highs in the interpolation
-
-            if (gcount < 1 || gcount > 8192) {
-                gcount = 8192;
-            }
-            int count = gcount;
-            pL[count + 8192] = pL[count] = inputSampleL;
-
-            double offset = depth + (depth * sin(sweep));
-            count += (int)floor(offset);
-
-            inputSampleL = pL[count] * (1.0 - (offset - floor(offset))); //less as value moves away from .0
-            inputSampleL += pL[count + 1]; //we can assume always using this in one way or another?
-            inputSampleL += pL[count + 2] * (offset - floor(offset)); //greater as value moves away from .0
-            inputSampleL -= ((pL[count] - pL[count + 1]) - (pL[count + 1] - pL[count + 2])) / 50.0; //interpolation hacks 'r us
-            inputSampleL *= 0.5; // gain trim
-
-            sweep += (speed + (speedB * sin(sweepB) * depthB));
-            sweepB += speedB;
-            if (sweep > tupi) {
-                sweep -= tupi;
-            }
-            if (sweep < 0.0) {
-                sweep += tupi;
-            } //through zero FM
-            if (sweepB > tupi) {
-                sweepB -= tupi;
-            }
-            gcount--;
-            //still scrolling through the samples, remember
-
-            if (wet != 1.0) {
-                inputSampleL = (inputSampleL * wet) + (drySampleL * (1.0 - fabs(wet)));
-            }
-            //Inv/Dry/Wet control
-
-            //begin 32 bit stereo floating point dither
-            int expon;
-            frexpf((float)inputSampleL, &expon);
-            fpd ^= fpd << 13;
-            fpd ^= fpd >> 17;
-            fpd ^= fpd << 5;
-            inputSampleL += ((double(fpd) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
-            //end 32 bit stereo floating point dither
 
             // triggers
-            if (sweep < 0.1) {
+            if (sweep[0] < 0.1) {
                 eocPulse.trigger(1e-3);
             }
-            if (sweepB < 0.1) {
+            if (sweepB[0] < 0.1) {
                 eocFmPulse.trigger(1e-3);
             }
 
             // lights
-            lights[SPEED_LIGHT].setSmoothBrightness(fmaxf(0.0, (-sweep / 5) + 1), args.sampleTime);
-            lights[SPEED_FM_LIGHT].setSmoothBrightness(fmaxf(0.0, (-sweepB / 5) + 1), args.sampleTime);
+            lights[SPEED_LIGHT].setSmoothBrightness(fmaxf(0.0, (-sweep[0] / 5) + 1), args.sampleTime);
+            lights[SPEED_FM_LIGHT].setSmoothBrightness(fmaxf(0.0, (-sweepB[0] / 5) + 1), args.sampleTime);
 
-            // outputs
-            outputs[OUT_OUTPUT].setVoltage(inputSampleL);
+            // trigger outputs
             outputs[EOC_OUTPUT].setVoltage((eocPulse.process(args.sampleTime) ? 10.0 : 0.0));
             outputs[EOC_FM_OUTPUT].setVoltage((eocFmPulse.process(args.sampleTime) ? 10.0 : 0.0));
         }
