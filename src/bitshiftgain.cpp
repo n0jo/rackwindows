@@ -10,6 +10,7 @@ Changes/Additions:
 - if no input is connected, the respective output will provide constant voltage selectable in 1V steps from -8V to +8V
 - option to link bottom BSG to top BSG -> gain shifts at top BSG are automatically compensated for by the bottom BSG
 - if linked, bottom knob acts as an offset
+- polyphonic
 
 Some UI elements based on graphics from the Component Library by Wes Milholen. 
 
@@ -42,23 +43,20 @@ struct Bitshiftgain : Module {
         NUM_LIGHTS
     };
 
-    double gain1;
-    double gain2;
     int shift1;
     int shift2;
+
     bool isLinked;
 
     Bitshiftgain()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(SHIFT1_PARAM, -8.0, 8.0, 0.0, "Shift");
-        configParam(SHIFT2_PARAM, -8.0, 8.0, 0.0, "Shift");
+        configParam(SHIFT2_PARAM, -8.0, 8.0, 0.0, "Shift/Offset");
         configParam(LINK_PARAM, 0.f, 1.f, 0.0, "Link");
 
-        gain1 = 1.0;
-        gain2 = 1.0;
-        shift1 = 0;
-        shift2 = 0;
+        shift1 = shift2 = 0;
+
         isLinked = false;
     }
 
@@ -174,36 +172,59 @@ struct Bitshiftgain : Module {
 
     void process(const ProcessArgs& args) override
     {
-        // knob values
-        shift1 = (int)trunc(params[SHIFT1_PARAM].getValue());
-        shift2 = (int)trunc(params[SHIFT2_PARAM].getValue());
+        // get knob parameters
+        shift1 = params[SHIFT1_PARAM].getValue();
+        shift2 = params[SHIFT2_PARAM].getValue();
 
-        // link light
+        // link
         isLinked = params[LINK_PARAM].getValue() ? true : false;
-        lights[LINK_LIGHT].setBrightness(isLinked);
 
-        // gain
-        gain1 = bitShift(shift1);
-        if (isLinked) {
-            gain2 = bitShift(-shift1 + shift2);
-        } else {
-            gain2 = bitShift(shift2);
-        }
-
-        // output1
+        // upper section
         if (inputs[IN1_INPUT].isConnected()) {
-            outputs[OUT1_OUTPUT].setVoltage(inputs[IN1_INPUT].getVoltage() * gain1);
+            // get number of polyphonic channels
+            int numChannels1 = inputs[IN1_INPUT].getChannels();
+
+            // set number of output channels
+            outputs[OUT1_OUTPUT].setChannels(numChannels1);
+
+            for (int i = 0; i < numChannels1; i++) {
+                // shift signal in 6db steps
+                outputs[OUT1_OUTPUT].setVoltage(inputs[IN1_INPUT].getPolyVoltage(i) * bitShift(shift1), i);
+            }
         } else {
-            // output -8 to 8 if no input is connected
+            // output -8 to 8 in 1V steps if no input is connected
             outputs[OUT1_OUTPUT].setVoltage(shift1);
         }
-        //output2
+
+        // lower section
         if (inputs[IN2_INPUT].isConnected()) {
-            outputs[OUT2_OUTPUT].setVoltage(inputs[IN2_INPUT].getVoltage() * gain2);
+            // get number of polyphonic channels
+            int numChannels2 = inputs[IN2_INPUT].getChannels();
+
+            // set number of output channels
+            outputs[OUT2_OUTPUT].setChannels(numChannels2);
+
+            for (int i = 0; i < numChannels2; i++) {
+                if (isLinked) {
+                    if (inputs[IN1_INPUT].isConnected()) {
+                        // offset signal in 6db steps
+                        outputs[OUT2_OUTPUT].setVoltage(inputs[IN2_INPUT].getPolyVoltage(i) * bitShift(-shift1 + shift2), i);
+                    } else {
+                        // offset signal in 1V steps
+                        outputs[OUT2_OUTPUT].setVoltage(inputs[IN2_INPUT].getPolyVoltage(i) + shift2, i);
+                    }
+                } else {
+                    // shift signal in 6db steps
+                    outputs[OUT2_OUTPUT].setVoltage(inputs[IN2_INPUT].getPolyVoltage(i) * bitShift(shift2), i);
+                }
+            }
         } else {
-            // output -8 to 8 if no input is connected
+            // output -8 to 8 in 1V steps if no input is connected
             outputs[OUT2_OUTPUT].setVoltage(shift2);
         }
+
+        // link light
+        lights[LINK_LIGHT].setBrightness(isLinked);
     }
 };
 
