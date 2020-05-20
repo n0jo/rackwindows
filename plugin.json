@@ -57,7 +57,11 @@
       "slug": "console",
       "name": "Console",
       "description": "Stereo summing mixer",
-      "tags": ["Mixer", "Utility"]
+      "tags": [
+        "Mixer",
+        "Polyphonic",
+        "Utility"
+      ]
     },
     {
       "slug": "distance",
@@ -65,6 +69,7 @@
       "description": "Far-away-izer",
       "tags": [
         "Effect",
+        "Polyphonic",
         "Utility"
       ]
     },
@@ -74,6 +79,7 @@
       "description": "Texas tone and texture",
       "tags": [
         "Distortion",
+        "Polyphonic",
         "Effect"
       ]
     },
@@ -92,7 +98,8 @@
       "description": "All-purpose tape mojo",
       "tags": [
         "Distortion",
-        "Effect"
+        "Effect",
+        "Polyphonic"
       ]
     },
     {
