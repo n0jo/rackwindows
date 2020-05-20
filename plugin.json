@@ -101,6 +101,7 @@
       "description": "Fluctuating saturation curves",
       "tags": [
         "Effect",
+        "Polyphonic",
         "Utility"
       ]
     },
