@@ -38,6 +38,11 @@ struct Capacitor : Module {
         NUM_LIGHTS
     };
 
+    const double gainCut = 0.03125;
+    const double gainBoost = 32.0;
+
+    bool quality;
+
     // 32 bit variables
     struct vars32 {
         float iirHighpassA;
@@ -64,7 +69,7 @@ struct Capacitor : Module {
         float lastLowpass;
         float lastHighpass;
         float lastWet;
-    } v32;
+    } v32[16];
 
     // 64 bit variables
     struct vars64 {
@@ -92,15 +97,14 @@ struct Capacitor : Module {
         double lastLowpass;
         double lastHighpass;
         double lastWet;
-    } v64;
+    } v64[16];
 
-    long double fpNShape;
+    int count[16];
 
-    int count;
+    long double fpNShape[16];
 
     float A;
     float B;
-    float C;
 
     Capacitor()
     {
@@ -109,207 +113,207 @@ struct Capacitor : Module {
         configParam(HIGHPASS_PARAM, 0.f, 1.f, 0.f, "Highpass");
         configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
 
-        v32.iirHighpassA = v64.iirHighpassA = 0.0;
-        v32.iirHighpassB = v64.iirHighpassB = 0.0;
-        v32.iirHighpassC = v64.iirHighpassC = 0.0;
-        v32.iirHighpassD = v64.iirHighpassD = 0.0;
-        v32.iirHighpassE = v64.iirHighpassE = 0.0;
-        v32.iirHighpassF = v64.iirHighpassF = 0.0;
-        v32.iirLowpassA = v64.iirLowpassA = 0.0;
-        v32.iirLowpassB = v64.iirLowpassB = 0.0;
-        v32.iirLowpassC = v64.iirLowpassC = 0.0;
-        v32.iirLowpassD = v64.iirLowpassD = 0.0;
-        v32.iirLowpassE = v64.iirLowpassE = 0.0;
-        v32.iirLowpassF = v64.iirLowpassF = 0.0;
-        v32.lowpassChase = v64.lowpassChase = 0.0;
-        v32.highpassChase = v64.highpassChase = 0.0;
-        v32.wetChase = v64.wetChase = 0.0;
-        v32.lowpassAmount = v64.lowpassAmount = 1.0;
-        v32.highpassAmount = v64.highpassAmount = 0.0;
-        v32.wet = v64.wet = 1.0;
-        v32.lastLowpass = v64.lastLowpass = 1000.0;
-        v32.lastHighpass = v64.lastHighpass = 1000.0;
-        v32.lastWet = v64.lastWet = 1000.0;
+        quality = loadQuality();
 
-        count = 0;
+        for (int i = 0; i < 16; i++) {
+            v32[i].iirHighpassA = v64[i].iirHighpassA = 0.0;
+            v32[i].iirHighpassB = v64[i].iirHighpassB = 0.0;
+            v32[i].iirHighpassC = v64[i].iirHighpassC = 0.0;
+            v32[i].iirHighpassD = v64[i].iirHighpassD = 0.0;
+            v32[i].iirHighpassE = v64[i].iirHighpassE = 0.0;
+            v32[i].iirHighpassF = v64[i].iirHighpassF = 0.0;
+            v32[i].iirLowpassA = v64[i].iirLowpassA = 0.0;
+            v32[i].iirLowpassB = v64[i].iirLowpassB = 0.0;
+            v32[i].iirLowpassC = v64[i].iirLowpassC = 0.0;
+            v32[i].iirLowpassD = v64[i].iirLowpassD = 0.0;
+            v32[i].iirLowpassE = v64[i].iirLowpassE = 0.0;
+            v32[i].iirLowpassF = v64[i].iirLowpassF = 0.0;
+            v32[i].lowpassChase = v64[i].lowpassChase = 0.0;
+            v32[i].highpassChase = v64[i].highpassChase = 0.0;
+            v32[i].wetChase = v64[i].wetChase = 0.0;
+            v32[i].lowpassAmount = v64[i].lowpassAmount = 1.0;
+            v32[i].highpassAmount = v64[i].highpassAmount = 0.0;
+            v32[i].wet = v64[i].wet = 1.0;
+            v32[i].lastLowpass = v64[i].lastLowpass = 1000.0;
+            v32[i].lastHighpass = v64[i].lastHighpass = 1000.0;
+            v32[i].lastWet = v64[i].lastWet = 1000.0;
 
-        fpNShape = 0.0;
+            count[i] = 0;
+
+            fpNShape[i] = 0.0;
+        }
     }
 
-    void processChannel32(vars32 v, Input& input, Output& output)
+    void onReset() override
+    {
+        resetNonJson(false);
+    }
+
+    void resetNonJson(bool recurseNonJson)
+    {
+    }
+
+    void onRandomize() override
+    {
+    }
+
+    json_t* dataToJson() override
+    {
+        json_t* rootJ = json_object();
+
+        // quality
+        json_object_set_new(rootJ, "quality", json_integer(quality));
+
+        return rootJ;
+    }
+
+    void dataFromJson(json_t* rootJ) override
+    {
+        // quality
+        json_t* qualityJ = json_object_get(rootJ, "quality");
+        if (qualityJ)
+            quality = json_integer_value(qualityJ);
+
+        resetNonJson(true);
+    }
+
+    void processChannel32(vars32 v[], Input& input, Output& output)
     {
         if (output.isConnected()) {
 
-            // poly
+            // params
+            A = params[LOWPASS_PARAM].getValue();
+            A += inputs[LOWPASS_CV_INPUT].getVoltage() / 5;
+            A = clamp(A, 0.01f, 0.99f);
+
+            B = params[HIGHPASS_PARAM].getValue();
+            B += inputs[HIGHPASS_CV_INPUT].getVoltage() / 5;
+            B = clamp(B, 0.01f, 0.99f);
+
+            float lowpassSpeed;
+            float highpassSpeed;
+            float invLowpass;
+            float invHighpass;
+
+            float inputSample;
+
+            // for each poly channel
             for (int i = 0, numChannels = std::max(1, inputs[IN_INPUT].getChannels()); i < numChannels; ++i) {
 
-                // params
-                A = params[LOWPASS_PARAM].getValue();
-                A += inputs[LOWPASS_CV_INPUT].getVoltage() / 5;
-                A = clamp(A, 0.01f, 0.99f);
-
-                B = params[HIGHPASS_PARAM].getValue();
-                B += inputs[HIGHPASS_CV_INPUT].getVoltage() / 5;
-                B = clamp(B, 0.01f, 0.99f);
-
-                // C = 1.0;
-
-                v.lowpassChase = pow(A, 2);
-                v.highpassChase = pow(B, 2);
-                // v.wetChase = C;
+                v[i].lowpassChase = pow(A, 2);
+                v[i].highpassChase = pow(B, 2);
                 //should not scale with sample rate, because values reaching 1 are important
                 //to its ability to bypass when set to max
-                float lowpassSpeed = 300 / (fabs(v.lastLowpass - v.lowpassChase) + 1.0);
-                float highpassSpeed = 300 / (fabs(v.lastHighpass - v.highpassChase) + 1.0);
-                // float wetSpeed = 300 / (fabs(v.lastWet - v.wetChase) + 1.0);
-                v.lastLowpass = v.lowpassChase;
-                v.lastHighpass = v.highpassChase;
-                // v.lastWet = v.wetChase;
-
-                float invLowpass;
-                float invHighpass;
-                // float dry;
-
-                // float drySample;
+                lowpassSpeed = 300 / (fabs(v[i].lastLowpass - v[i].lowpassChase) + 1.0);
+                highpassSpeed = 300 / (fabs(v[i].lastHighpass - v[i].highpassChase) + 1.0);
+                v[i].lastLowpass = v[i].lowpassChase;
+                v[i].lastHighpass = v[i].highpassChase;
 
                 // input
-                float inputSample = inputs[IN_INPUT].getPolyVoltage(i);
+                inputSample = inputs[IN_INPUT].getPolyVoltage(i);
 
-                // if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
-                //     static int noisesource = 0;
-                //     //this declares a variable before anything else is compiled. It won't keep assigning
-                //     //it to 0 for every sample, it's as if the declaration doesn't exist in this context,
-                //     //but it lets me add this denormalization fix in a single place rather than updating
-                //     //it in three different locations. The variable isn't thread-safe but this is only
-                //     //a random seed and we can share it with whatever.
-                //     noisesource = noisesource % 1700021;
-                //     noisesource++;
-                //     int residue = noisesource * noisesource;
-                //     residue = residue % 170003;
-                //     residue *= residue;
-                //     residue = residue % 17011;
-                //     residue *= residue;
-                //     residue = residue % 1709;
-                //     residue *= residue;
-                //     residue = residue % 173;
-                //     residue *= residue;
-                //     residue = residue % 17;
-                //     double applyresidue = residue;
-                //     applyresidue *= 0.00000001;
-                //     applyresidue *= 0.00000001;
-                //     inputSample = applyresidue;
-                // }
+                // pad gain
+                inputSample *= gainCut;
 
-                // drySample = inputSample;
+                v[i].lowpassAmount = (((v[i].lowpassAmount * lowpassSpeed) + v[i].lowpassChase) / (lowpassSpeed + 1.0));
+                invLowpass = 1.0 - v[i].lowpassAmount;
+                v[i].highpassAmount = (((v[i].highpassAmount * highpassSpeed) + v[i].highpassChase) / (highpassSpeed + 1.0));
+                invHighpass = 1.0 - v[i].highpassAmount;
 
-                v.lowpassAmount = (((v.lowpassAmount * lowpassSpeed) + v.lowpassChase) / (lowpassSpeed + 1.0));
-                invLowpass = 1.0 - v.lowpassAmount;
-                v.highpassAmount = (((v.highpassAmount * highpassSpeed) + v.highpassChase) / (highpassSpeed + 1.0));
-                invHighpass = 1.0 - v.highpassAmount;
-                // v.wet = (((v.wet * wetSpeed) + v.wetChase) / (wetSpeed + 1.0));
-                // dry = 1.0 - v.wet;
-
-                count++;
-                if (count > 5)
-                    count = 0;
-                switch (count) {
-                case 0:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassB = (v.iirHighpassB * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassB;
-                    v.iirLowpassB = (v.iirLowpassB * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassB;
-                    v.iirHighpassD = (v.iirHighpassD * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassD;
-                    v.iirLowpassD = (v.iirLowpassD * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassD;
-                    break;
-                case 1:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassC = (v.iirHighpassC * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassC;
-                    v.iirLowpassC = (v.iirLowpassC * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassC;
-                    v.iirHighpassE = (v.iirHighpassE * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassE;
-                    v.iirLowpassE = (v.iirLowpassE * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassE;
-                    break;
-                case 2:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassB = (v.iirHighpassB * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassB;
-                    v.iirLowpassB = (v.iirLowpassB * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassB;
-                    v.iirHighpassF = (v.iirHighpassF * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassF;
-                    v.iirLowpassF = (v.iirLowpassF * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassF;
-                    break;
-                case 3:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassC = (v.iirHighpassC * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassC;
-                    v.iirLowpassC = (v.iirLowpassC * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassC;
-                    v.iirHighpassD = (v.iirHighpassD * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassD;
-                    v.iirLowpassD = (v.iirLowpassD * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassD;
-                    break;
-                case 4:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassB = (v.iirHighpassB * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassB;
-                    v.iirLowpassB = (v.iirLowpassB * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassB;
-                    v.iirHighpassE = (v.iirHighpassE * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassE;
-                    v.iirLowpassE = (v.iirLowpassE * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassE;
-                    break;
-                case 5:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassC = (v.iirHighpassC * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassC;
-                    v.iirLowpassC = (v.iirLowpassC * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassC;
-                    v.iirHighpassF = (v.iirHighpassF * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassF;
-                    v.iirLowpassF = (v.iirLowpassF * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassF;
-                    break;
-                }
                 //Highpass Filter chunk. This is three poles of IIR highpass, with a 'gearbox' that progressively
                 //steepens the filter after minimizing artifacts.
+                count[i]++;
+                if (count[i] > 5)
+                    count[i] = 0;
+                switch (count[i]) {
+                case 0:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassB = (v[i].iirHighpassB * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassB;
+                    v[i].iirLowpassB = (v[i].iirLowpassB * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassB;
+                    v[i].iirHighpassD = (v[i].iirHighpassD * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassD;
+                    v[i].iirLowpassD = (v[i].iirLowpassD * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassD;
+                    break;
+                case 1:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassC = (v[i].iirHighpassC * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassC;
+                    v[i].iirLowpassC = (v[i].iirLowpassC * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassC;
+                    v[i].iirHighpassE = (v[i].iirHighpassE * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassE;
+                    v[i].iirLowpassE = (v[i].iirLowpassE * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassE;
+                    break;
+                case 2:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassB = (v[i].iirHighpassB * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassB;
+                    v[i].iirLowpassB = (v[i].iirLowpassB * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassB;
+                    v[i].iirHighpassF = (v[i].iirHighpassF * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassF;
+                    v[i].iirLowpassF = (v[i].iirLowpassF * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassF;
+                    break;
+                case 3:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassC = (v[i].iirHighpassC * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassC;
+                    v[i].iirLowpassC = (v[i].iirLowpassC * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassC;
+                    v[i].iirHighpassD = (v[i].iirHighpassD * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassD;
+                    v[i].iirLowpassD = (v[i].iirLowpassD * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassD;
+                    break;
+                case 4:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassB = (v[i].iirHighpassB * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassB;
+                    v[i].iirLowpassB = (v[i].iirLowpassB * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassB;
+                    v[i].iirHighpassE = (v[i].iirHighpassE * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassE;
+                    v[i].iirLowpassE = (v[i].iirLowpassE * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassE;
+                    break;
+                case 5:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassC = (v[i].iirHighpassC * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassC;
+                    v[i].iirLowpassC = (v[i].iirLowpassC * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassC;
+                    v[i].iirHighpassF = (v[i].iirHighpassF * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassF;
+                    v[i].iirLowpassF = (v[i].iirLowpassF * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassF;
+                    break;
+                }
 
-                // inputSample = (drySample * dry) + (inputSample * v.wet);
-
-                //stereo 32 bit dither, made small and tidy.
-                // int expon;
-                // frexpf((float)inputSample, &expon);
-                // long double dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
-                // inputSample += (dither - fpNShape);
-                // fpNShape = dither;
-                //end 32 bit dither
+                // bring gain back up
+                inputSample *= gainBoost;
 
                 // output
                 output.setChannels(numChannels);
@@ -318,47 +322,44 @@ struct Capacitor : Module {
         }
     }
 
-    void processChannel64(vars64 v, Input& input, Output& output)
+    void processChannel64(vars64 v[], Input& input, Output& output)
     {
-        if (outputs[OUT_OUTPUT].isConnected()) {
+        if (output.isConnected()) {
 
-            // poly
+            // params
+            A = params[LOWPASS_PARAM].getValue();
+            A += inputs[LOWPASS_CV_INPUT].getVoltage() / 5;
+            A = clamp(A, 0.01f, 0.99f);
+
+            B = params[HIGHPASS_PARAM].getValue();
+            B += inputs[HIGHPASS_CV_INPUT].getVoltage() / 5;
+            B = clamp(B, 0.01f, 0.99f);
+
+            double lowpassSpeed;
+            double highpassSpeed;
+            double invLowpass;
+            double invHighpass;
+
+            long double inputSample;
+
+            // for each poly channel
             for (int i = 0, numChannels = std::max(1, inputs[IN_INPUT].getChannels()); i < numChannels; ++i) {
 
-                // params
-                A = params[LOWPASS_PARAM].getValue();
-                A += inputs[LOWPASS_CV_INPUT].getVoltage() / 5;
-                A = clamp(A, 0.01f, 0.99f);
-
-                B = params[HIGHPASS_PARAM].getValue();
-                B += inputs[HIGHPASS_CV_INPUT].getVoltage() / 5;
-                B = clamp(B, 0.01f, 0.99f);
-
-                C = 1.0;
-
-                // input
-                float in1 = inputs[IN_INPUT].getPolyVoltage(i);
-
-                v.lowpassChase = pow(A, 2);
-                v.highpassChase = pow(B, 2);
-                // v.wetChase = C;
+                v[i].lowpassChase = pow(A, 2);
+                v[i].highpassChase = pow(B, 2);
                 //should not scale with sample rate, because values reaching 1 are important
                 //to its ability to bypass when set to max
-                double lowpassSpeed = 300 / (fabs(v.lastLowpass - v.lowpassChase) + 1.0);
-                double highpassSpeed = 300 / (fabs(v.lastHighpass - v.highpassChase) + 1.0);
-                double wetSpeed = 300 / (fabs(v.lastWet - v.wetChase) + 1.0);
-                v.lastLowpass = v.lowpassChase;
-                v.lastHighpass = v.highpassChase;
-                v.lastWet = v.wetChase;
+                lowpassSpeed = 300 / (fabs(v[i].lastLowpass - v[i].lowpassChase) + 1.0);
+                highpassSpeed = 300 / (fabs(v[i].lastHighpass - v[i].highpassChase) + 1.0);
+                v[i].lastLowpass = v[i].lowpassChase;
+                v[i].lastHighpass = v[i].highpassChase;
 
-                double invLowpass;
-                double invHighpass;
-                double dry;
+                // input
+                inputSample = inputs[IN_INPUT].getPolyVoltage(i);
 
-                long double inputSample;
-                float drySampleL;
+                // pad gain
+                inputSample *= gainCut;
 
-                inputSample = in1;
                 if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
                     static int noisesource = 0;
                     //this declares a variable before anything else is compiled. It won't keep assigning
@@ -383,116 +384,114 @@ struct Capacitor : Module {
                     applyresidue *= 0.00000001;
                     inputSample = applyresidue;
                 }
-                drySampleL = inputSample;
 
-                v.lowpassAmount = (((v.lowpassAmount * lowpassSpeed) + v.lowpassChase) / (lowpassSpeed + 1.0));
-                invLowpass = 1.0 - v.lowpassAmount;
-                v.highpassAmount = (((v.highpassAmount * highpassSpeed) + v.highpassChase) / (highpassSpeed + 1.0));
-                invHighpass = 1.0 - v.highpassAmount;
-                v.wet = (((v.wet * wetSpeed) + v.wetChase) / (wetSpeed + 1.0));
-                dry = 1.0 - v.wet;
+                v[i].lowpassAmount = (((v[i].lowpassAmount * lowpassSpeed) + v[i].lowpassChase) / (lowpassSpeed + 1.0));
+                invLowpass = 1.0 - v[i].lowpassAmount;
+                v[i].highpassAmount = (((v[i].highpassAmount * highpassSpeed) + v[i].highpassChase) / (highpassSpeed + 1.0));
+                invHighpass = 1.0 - v[i].highpassAmount;
 
-                count++;
-                if (count > 5)
-                    count = 0;
-                switch (count) {
-                case 0:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassB = (v.iirHighpassB * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassB;
-                    v.iirLowpassB = (v.iirLowpassB * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassB;
-                    v.iirHighpassD = (v.iirHighpassD * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassD;
-                    v.iirLowpassD = (v.iirLowpassD * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassD;
-                    break;
-                case 1:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassC = (v.iirHighpassC * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassC;
-                    v.iirLowpassC = (v.iirLowpassC * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassC;
-                    v.iirHighpassE = (v.iirHighpassE * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassE;
-                    v.iirLowpassE = (v.iirLowpassE * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassE;
-                    break;
-                case 2:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassB = (v.iirHighpassB * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassB;
-                    v.iirLowpassB = (v.iirLowpassB * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassB;
-                    v.iirHighpassB = (v.iirHighpassB * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassB;
-                    v.iirLowpassF = (v.iirLowpassF * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassF;
-                    break;
-                case 3:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassC = (v.iirHighpassC * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassC;
-                    v.iirLowpassC = (v.iirLowpassC * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassC;
-                    v.iirHighpassD = (v.iirHighpassD * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassD;
-                    v.iirLowpassD = (v.iirLowpassD * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassD;
-                    break;
-                case 4:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassB = (v.iirHighpassB * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassB;
-                    v.iirLowpassB = (v.iirLowpassB * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassB;
-                    v.iirHighpassE = (v.iirHighpassE * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassE;
-                    v.iirLowpassE = (v.iirLowpassE * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassE;
-                    break;
-                case 5:
-                    v.iirHighpassA = (v.iirHighpassA * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassA;
-                    v.iirLowpassA = (v.iirLowpassA * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassA;
-                    v.iirHighpassC = (v.iirHighpassC * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassC;
-                    v.iirLowpassC = (v.iirLowpassC * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassC;
-                    v.iirHighpassB = (v.iirHighpassB * invHighpass) + (inputSample * v.highpassAmount);
-                    inputSample -= v.iirHighpassB;
-                    v.iirLowpassF = (v.iirLowpassF * invLowpass) + (inputSample * v.lowpassAmount);
-                    inputSample = v.iirLowpassF;
-                    break;
-                }
                 //Highpass Filter chunk. This is three poles of IIR highpass, with a 'gearbox' that progressively
                 //steepens the filter after minimizing artifacts.
-
-                inputSample = (drySampleL * dry) + (inputSample * v.wet);
+                count[i]++;
+                if (count[i] > 5)
+                    count[i] = 0;
+                switch (count[i]) {
+                case 0:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassB = (v[i].iirHighpassB * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassB;
+                    v[i].iirLowpassB = (v[i].iirLowpassB * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassB;
+                    v[i].iirHighpassD = (v[i].iirHighpassD * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassD;
+                    v[i].iirLowpassD = (v[i].iirLowpassD * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassD;
+                    break;
+                case 1:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassC = (v[i].iirHighpassC * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassC;
+                    v[i].iirLowpassC = (v[i].iirLowpassC * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassC;
+                    v[i].iirHighpassE = (v[i].iirHighpassE * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassE;
+                    v[i].iirLowpassE = (v[i].iirLowpassE * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassE;
+                    break;
+                case 2:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassB = (v[i].iirHighpassB * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassB;
+                    v[i].iirLowpassB = (v[i].iirLowpassB * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassB;
+                    v[i].iirHighpassF = (v[i].iirHighpassF * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassF;
+                    v[i].iirLowpassF = (v[i].iirLowpassF * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassF;
+                    break;
+                case 3:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassC = (v[i].iirHighpassC * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassC;
+                    v[i].iirLowpassC = (v[i].iirLowpassC * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassC;
+                    v[i].iirHighpassD = (v[i].iirHighpassD * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassD;
+                    v[i].iirLowpassD = (v[i].iirLowpassD * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassD;
+                    break;
+                case 4:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassB = (v[i].iirHighpassB * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassB;
+                    v[i].iirLowpassB = (v[i].iirLowpassB * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassB;
+                    v[i].iirHighpassE = (v[i].iirHighpassE * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassE;
+                    v[i].iirLowpassE = (v[i].iirLowpassE * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassE;
+                    break;
+                case 5:
+                    v[i].iirHighpassA = (v[i].iirHighpassA * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassA;
+                    v[i].iirLowpassA = (v[i].iirLowpassA * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassA;
+                    v[i].iirHighpassC = (v[i].iirHighpassC * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassC;
+                    v[i].iirLowpassC = (v[i].iirLowpassC * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassC;
+                    v[i].iirHighpassF = (v[i].iirHighpassF * invHighpass) + (inputSample * v[i].highpassAmount);
+                    inputSample -= v[i].iirHighpassF;
+                    v[i].iirLowpassF = (v[i].iirLowpassF * invLowpass) + (inputSample * v[i].lowpassAmount);
+                    inputSample = v[i].iirLowpassF;
+                    break;
+                }
 
                 //stereo 32 bit dither, made small and tidy.
                 int expon;
                 frexpf((float)inputSample, &expon);
                 long double dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
-                inputSample += (dither - fpNShape);
-                fpNShape = dither;
+                inputSample += (dither - fpNShape[i]);
+                fpNShape[i] = dither;
                 //end 32 bit dither
+
+                // bring gain back up
+                inputSample *= gainBoost;
 
                 // output
                 output.setChannels(numChannels);
@@ -503,12 +502,58 @@ struct Capacitor : Module {
 
     void process(const ProcessArgs& args) override
     {
-        processChannel32(v32, inputs[IN_INPUT], outputs[OUT_OUTPUT]);
-        // processChannel64(v64, inputs[IN_INPUT], outputs[OUT_OUTPUT]);
+        switch (quality) {
+        case 1:
+            processChannel32(v32, inputs[IN_INPUT], outputs[OUT_OUTPUT]);
+            break;
+        default:
+            processChannel64(v64, inputs[IN_INPUT], outputs[OUT_OUTPUT]);
+        }
     }
 };
 
 struct CapacitorWidget : ModuleWidget {
+
+    // quality item
+    struct QualityItem : MenuItem {
+        Capacitor* module;
+        int quality;
+
+        void onAction(const event::Action& e) override
+        {
+            module->quality = quality;
+        }
+
+        void step() override
+        {
+            rightText = (module->quality == quality) ? "✔" : "";
+        }
+    };
+
+    void appendContextMenu(Menu* menu) override
+    {
+        Capacitor* module = dynamic_cast<Capacitor*>(this->module);
+        assert(module);
+
+        menu->addChild(new MenuSeparator()); // separator
+
+        MenuLabel* qualityLabel = new MenuLabel(); // menu label
+        qualityLabel->text = "Quality";
+        menu->addChild(qualityLabel);
+
+        QualityItem* high = new QualityItem(); // high quality
+        high->text = "High";
+        high->module = module;
+        high->quality = 0;
+        menu->addChild(high);
+
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Low";
+        low->module = module;
+        low->quality = 1;
+        menu->addChild(low);
+    }
+
     CapacitorWidget(Capacitor* module)
     {
         setModule(module);

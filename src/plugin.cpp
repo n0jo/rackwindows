@@ -25,6 +25,46 @@ void init(Plugin* p)
 
 /* Other stuff */
 
+// processing quality
+void saveQuality(bool quality)
+{
+    json_t* settingsJ = json_object();
+    json_object_set_new(settingsJ, "quality", json_boolean(quality));
+    std::string settingsFilename = asset::user("Rackwindows.json");
+    FILE* file = fopen(settingsFilename.c_str(), "w");
+    if (file) {
+        json_dumpf(settingsJ, file, JSON_INDENT(2) | JSON_REAL_PRECISION(9));
+        fclose(file);
+    }
+    json_decref(settingsJ);
+}
+
+bool loadQuality()
+{
+    bool ret = false;
+    std::string settingsFilename = asset::user("Rackwindows.json");
+    FILE* file = fopen(settingsFilename.c_str(), "r");
+    if (!file) {
+        saveQuality(false);
+        return ret;
+    }
+    json_error_t error;
+    json_t* settingsJ = json_loadf(file, 0, &error);
+    if (!settingsJ) {
+        // invalid setting json file
+        fclose(file);
+        saveQuality(false);
+        return ret;
+    }
+    json_t* qualityJ = json_object_get(settingsJ, "quality");
+    if (qualityJ)
+        ret = json_boolean_value(qualityJ);
+
+    fclose(file);
+    json_decref(settingsJ);
+    return ret;
+}
+
 // console type
 void saveConsoleType(int consoleType)
 {
