@@ -20,3 +20,28 @@ extern Model* modelMv;
 extern Model* modelTape;
 extern Model* modelTremolo;
 extern Model* modelVibrato;
+
+/* other stuff */
+
+// sound quality settings
+void saveQuality(bool quality);
+bool loadQuality();
+
+// console types
+void saveConsoleType(int consoleType);
+int loadConsoleType();
+
+// themes
+static const std::string lightPanelID = "Light Panel";
+static const std::string darkPanelID = "Dark Panel";
+
+// https://github.com/MarcBoule/Geodesics/blob/master/src/Geodesics.hpp
+void saveDarkAsDefault(bool darkAsDefault);
+bool loadDarkAsDefault();
+
+struct DarkDefaultItem : MenuItem {
+    void onAction(const event::Action& e) override
+    {
+        saveDarkAsDefault(rightText.empty()); // implicitly toggled
+    }
+};
