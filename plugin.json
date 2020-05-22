@@ -39,7 +39,8 @@
       "description": "Filters (Stereo)",
       "tags": [
         "Equalizer",
-        "Filter"
+        "Filter",
+        "Polyphonic"
       ]
     },
     {
