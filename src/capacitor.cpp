@@ -9,6 +9,7 @@ Changes/Additions:
 - mono
 - no Dry/Wet
 - CV inputs for Lowpass and Highpass
+- polyphonic
 
 Some UI elements based on graphics from the Component Library by Wes Milholen. 
 
@@ -21,7 +22,7 @@ struct Capacitor : Module {
     enum ParamIds {
         LOWPASS_PARAM,
         HIGHPASS_PARAM,
-        DRYWET_PARAM,
+        // DRYWET_PARAM,
         NUM_PARAMS
     };
     enum InputIds {
@@ -60,15 +61,15 @@ struct Capacitor : Module {
 
         float lowpassChase;
         float highpassChase;
-        float wetChase;
+        // float wetChase;
 
         float lowpassAmount;
         float highpassAmount;
-        float wet;
+        // float wet;
 
         float lastLowpass;
         float lastHighpass;
-        float lastWet;
+        // float lastWet;
     } v32[16];
 
     // 64 bit variables
@@ -88,15 +89,15 @@ struct Capacitor : Module {
 
         double lowpassChase;
         double highpassChase;
-        double wetChase;
+        // double wetChase;
 
         double lowpassAmount;
         double highpassAmount;
-        double wet;
+        // double wet;
 
         double lastLowpass;
         double lastHighpass;
-        double lastWet;
+        // double lastWet;
     } v64[16];
 
     int count[16];
@@ -111,7 +112,7 @@ struct Capacitor : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(LOWPASS_PARAM, 0.f, 1.f, 1.f, "Lowpass");
         configParam(HIGHPASS_PARAM, 0.f, 1.f, 0.f, "Highpass");
-        configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
+        // configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
 
         quality = loadQuality();
 
@@ -130,13 +131,13 @@ struct Capacitor : Module {
             v32[i].iirLowpassF = v64[i].iirLowpassF = 0.0;
             v32[i].lowpassChase = v64[i].lowpassChase = 0.0;
             v32[i].highpassChase = v64[i].highpassChase = 0.0;
-            v32[i].wetChase = v64[i].wetChase = 0.0;
+            // v32[i].wetChase = v64[i].wetChase = 0.0;
             v32[i].lowpassAmount = v64[i].lowpassAmount = 1.0;
             v32[i].highpassAmount = v64[i].highpassAmount = 0.0;
-            v32[i].wet = v64[i].wet = 1.0;
+            // v32[i].wet = v64[i].wet = 1.0;
             v32[i].lastLowpass = v64[i].lastLowpass = 1000.0;
             v32[i].lastHighpass = v64[i].lastHighpass = 1000.0;
-            v32[i].lastWet = v64[i].lastWet = 1000.0;
+            // v32[i].lastWet = v64[i].lastWet = 1000.0;
 
             count[i] = 0;
 
@@ -198,7 +199,7 @@ struct Capacitor : Module {
             float inputSample;
 
             // for each poly channel
-            for (int i = 0, numChannels = std::max(1, inputs[IN_INPUT].getChannels()); i < numChannels; ++i) {
+            for (int i = 0, numChannels = std::max(1, input.getChannels()); i < numChannels; ++i) {
 
                 v[i].lowpassChase = pow(A, 2);
                 v[i].highpassChase = pow(B, 2);
@@ -210,7 +211,7 @@ struct Capacitor : Module {
                 v[i].lastHighpass = v[i].highpassChase;
 
                 // input
-                inputSample = inputs[IN_INPUT].getPolyVoltage(i);
+                inputSample = input.getPolyVoltage(i);
 
                 // pad gain
                 inputSample *= gainCut;
