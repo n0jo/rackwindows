@@ -45,9 +45,10 @@ struct Console : Module {
     const double gainBoost = 32.0;
 
     // Need to save, no reset
-    int panelTheme;
+    // int panelTheme;
 
     // Need to save, with reset
+    bool quality;
     int consoleType;
 
     // No need to save, with reset
@@ -65,9 +66,10 @@ struct Console : Module {
 
         onReset();
 
+        quality = loadQuality();
         consoleType = loadConsoleType();
 
-        panelTheme = (loadDarkAsDefault() ? 1 : 0);
+        // panelTheme = (loadDarkAsDefault() ? 1 : 0);
 
         A = 1.0;
         fpd = 17;
@@ -92,25 +94,34 @@ struct Console : Module {
     {
         json_t* rootJ = json_object();
 
+        // quality
+        json_object_set_new(rootJ, "quality", json_integer(quality));
+
         // consoleType
         json_object_set_new(rootJ, "consoleType", json_integer(consoleType));
 
         // panelTheme
-        json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
+        // json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
 
         return rootJ;
     }
 
     void dataFromJson(json_t* rootJ) override
     {
+        // quality
+        json_t* qualityJ = json_object_get(rootJ, "quality");
+        if (qualityJ)
+            quality = json_integer_value(qualityJ);
+
+        // consoleType
         json_t* consoleTypeJ = json_object_get(rootJ, "consoleType");
         if (consoleTypeJ)
             consoleType = json_integer_value(consoleTypeJ);
 
         // panelTheme
-        json_t* panelThemeJ = json_object_get(rootJ, "panelTheme");
-        if (panelThemeJ)
-            panelTheme = json_integer_value(panelThemeJ);
+        // json_t* panelThemeJ = json_object_get(rootJ, "panelTheme");
+        // if (panelThemeJ)
+        //     panelTheme = json_integer_value(panelThemeJ);
 
         resetNonJson(true);
     }
@@ -176,8 +187,10 @@ struct Console : Module {
                 // pad gain, will be boosted in consoleBuss()
                 inputSample *= gainCut;
 
-                if (fabs(inputSample) < 1.18e-37)
-                    inputSample = fpd * 1.18e-37;
+                if (quality == 0) {
+                    if (fabs(inputSample) < 1.18e-37)
+                        inputSample = fpd * 1.18e-37;
+                }
 
                 // encode
                 inputSample = encode(inputSample, consoleType);
@@ -189,7 +202,8 @@ struct Console : Module {
         }
     }
 
-    void consoleBuss(Output& output, long double mix[], int maxChannels)
+    void
+    consoleBuss(Output& output, long double mix[], int maxChannels)
     {
         if (output.isConnected()) {
             float out[16] = {};
@@ -197,8 +211,10 @@ struct Console : Module {
             for (int i = 0; i < maxChannels; i++) {
                 long double inputSample = mix[i];
 
-                if (fabs(inputSample) < 1.18e-37)
-                    inputSample = fpd * 1.18e-37;
+                if (quality == 0) {
+                    if (fabs(inputSample) < 1.18e-37)
+                        inputSample = fpd * 1.18e-37;
+                }
 
                 // decode
                 inputSample = decode(inputSample, consoleType);
@@ -206,14 +222,16 @@ struct Console : Module {
                 // bring gain back up
                 inputSample *= gainBoost;
 
-                //begin 32 bit stereo floating point dither
-                int expon;
-                frexpf((float)inputSample, &expon);
-                fpd ^= fpd << 13;
-                fpd ^= fpd >> 17;
-                fpd ^= fpd << 5;
-                inputSample += ((double(fpd) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
-                //end 32 bit stereo floating point dither
+                if (quality == 0) {
+                    //begin 32 bit stereo floating point dither
+                    int expon;
+                    frexpf((float)inputSample, &expon);
+                    fpd ^= fpd << 13;
+                    fpd ^= fpd >> 17;
+                    fpd ^= fpd << 5;
+                    inputSample += ((double(fpd) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
+                    //end 32 bit stereo floating point dither
+                }
 
                 out[i] = (float)inputSample;
             }
@@ -264,10 +282,6 @@ struct Console : Module {
             // if (outputs[OUT_R_OUTPUT].isConnected()) {
             consoleBuss(outputs[OUT_R_OUTPUT], mixR, maxChannelsR); // decode R
             // }
-            // TODO: replace above L/R with below
-            // for (int i = 0; i < 2; i++) {
-            //     consoleBuss(outputs[OUT_OUTPUT + i], mix, maxChannels); // decode
-            // }
         }
     }
 };
@@ -275,6 +289,22 @@ struct Console : Module {
 struct ConsoleWidget : ModuleWidget {
 
     SvgPanel* darkPanel;
+
+    // quality item
+    struct QualityItem : MenuItem {
+        Console* module;
+        int quality;
+
+        void onAction(const event::Action& e) override
+        {
+            module->quality = quality;
+        }
+
+        void step() override
+        {
+            rightText = (module->quality == quality) ? "✔" : "";
+        }
+    };
 
     struct ConsoleTypeItem : MenuItem {
         Console* module;
@@ -291,25 +321,43 @@ struct ConsoleWidget : ModuleWidget {
         }
     };
 
-    struct PanelThemeItem : MenuItem {
-        Console* module;
-        int theme;
+    // struct PanelThemeItem : MenuItem {
+    //     Console* module;
+    //     int theme;
 
-        void onAction(const event::Action& e) override
-        {
-            module->panelTheme = theme;
-        }
+    //     void onAction(const event::Action& e) override
+    //     {
+    //         module->panelTheme = theme;
+    //     }
 
-        void step() override
-        {
-            rightText = (module->panelTheme == theme) ? "✔" : "";
-        }
-    };
+    //     void step() override
+    //     {
+    //         rightText = (module->panelTheme == theme) ? "✔" : "";
+    //     }
+    // };
 
     void appendContextMenu(Menu* menu) override
     {
         Console* module = dynamic_cast<Console*>(this->module);
         assert(module);
+
+        menu->addChild(new MenuSeparator()); // separator
+
+        MenuLabel* qualityLabel = new MenuLabel(); // menu label
+        qualityLabel->text = "Quality";
+        menu->addChild(qualityLabel);
+
+        QualityItem* high = new QualityItem(); // high quality
+        high->text = "High";
+        high->module = module;
+        high->quality = 0;
+        menu->addChild(high);
+
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Low";
+        low->module = module;
+        low->quality = 1;
+        menu->addChild(low);
 
         menu->addChild(new MenuSeparator()); // separator
 
@@ -329,25 +377,25 @@ struct ConsoleWidget : ModuleWidget {
         purestConsole->consoleType = 1;
         menu->addChild(purestConsole);
 
-        menu->addChild(new MenuSeparator()); // separator
+        // menu->addChild(new MenuSeparator()); // separator
 
-        MenuLabel* themeLabel = new MenuLabel(); // menu label
-        themeLabel->text = "Theme";
-        menu->addChild(themeLabel);
+        // MenuLabel* themeLabel = new MenuLabel(); // menu label
+        // themeLabel->text = "Theme";
+        // menu->addChild(themeLabel);
 
-        PanelThemeItem* lightItem = new PanelThemeItem(); // light theme
-        lightItem->text = lightPanelID; // plugin.hpp
-        lightItem->module = module;
-        lightItem->theme = 0;
-        menu->addChild(lightItem);
+        // PanelThemeItem* lightItem = new PanelThemeItem(); // light theme
+        // lightItem->text = lightPanelID; // plugin.hpp
+        // lightItem->module = module;
+        // lightItem->theme = 0;
+        // menu->addChild(lightItem);
 
-        PanelThemeItem* darkItem = new PanelThemeItem(); // dark theme
-        darkItem->text = darkPanelID; // plugin.hpp
-        darkItem->module = module;
-        darkItem->theme = 1;
-        menu->addChild(darkItem);
+        // PanelThemeItem* darkItem = new PanelThemeItem(); // dark theme
+        // darkItem->text = darkPanelID; // plugin.hpp
+        // darkItem->module = module;
+        // darkItem->theme = 1;
+        // menu->addChild(darkItem);
 
-        menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault()))); // dark theme as default
+        // menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault()))); // dark theme as default
     }
 
     ConsoleWidget(Console* module)
@@ -356,12 +404,12 @@ struct ConsoleWidget : ModuleWidget {
 
         // panel
         setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/console_dark.svg")));
-        if (module) {
-            darkPanel = new SvgPanel();
-            darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/console_light.svg")));
-            darkPanel->visible = false;
-            addChild(darkPanel);
-        }
+        // if (module) {
+        //     darkPanel = new SvgPanel();
+        //     darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/console_light.svg")));
+        //     darkPanel->visible = false;
+        //     addChild(darkPanel);
+        // }
 
         float center = box.size.x / 2.0f;
         // float col1 = center - box.size.x / 4.0f;
@@ -409,14 +457,14 @@ struct ConsoleWidget : ModuleWidget {
         addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.75, 325.0), module, Console::OUT_R_OUTPUT));
     }
 
-    void step() override
-    {
-        if (module) {
-            panel->visible = ((((Console*)module)->panelTheme) == 0);
-            darkPanel->visible = ((((Console*)module)->panelTheme) == 1);
-        }
-        Widget::step();
-    }
+    // void step() override
+    // {
+    //     if (module) {
+    //         panel->visible = ((((Console*)module)->panelTheme) == 0);
+    //         darkPanel->visible = ((((Console*)module)->panelTheme) == 1);
+    //     }
+    //     Widget::step();
+    // }
 };
 
 Model* modelConsole = createModel<Console, ConsoleWidget>("console");
