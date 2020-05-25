@@ -51,7 +51,9 @@ This surprisingly versatile module is a combination of Airwindows Chorus and Cho
 
 ![Rackwindows Console](res/images/console_panels.jpg)
 
-Airwindows Console systems sum signals in a way where the resulting soundstage appears less flat, more spacious and more in line with what we are used to from analog mixers. There are a number of variations/flavours of the console concept and this module currently implements the most recent one, Console6. However I'm planning to make others selectable as well. Please check the link below for further information on how exactly this effect is achieved.
+Airwindows Console systems sum signals in a way where the resulting soundstage appears less flat, more spacious and more in line with what we are used to from analog mixers. There are a number of variations/flavours of the console concept and this module currently implements the most recent one, Console6, and PurestConsole, which can be selected in the context menu. 
+
+Please check the link below for further information on how exactly this effect is achieved.
 
 **NOTE**: Due to how the encoding/decoding works, spaciousness and definition will increase with each additional channel. There will be **no** effect on a single channel at all.
 
@@ -124,6 +126,10 @@ FM Vibrator o_O
 Make sure to also play with the 'Inverse/Wet' knob for chorusing and flange effects. Two trigger outputs have been added for fun.
 
 [More information](http://www.airwindows.com/vibrato-vst)
+
+## A word on processing quality
+
+Some (eventually likely all) modules can be set to a lower quality mode in order to reduce CPU usage on weaker systems via context menu. The actual algorithms remain untouched, but simply run with reduced wordlength (float instead of double and long double). Also any noise shaping/dithering is skipped. This can result in speed improvements of roughly 10% to 50% depending on the module.
 
 ## Building from Source
 
