@@ -15,6 +15,7 @@ void init(Plugin* p)
     p->addModel(modelDistance);
     p->addModel(modelHombre);
     p->addModel(modelMv);
+    p->addModel(modelReseq);
     p->addModel(modelTape);
     p->addModel(modelTremolo);
     p->addModel(modelVibrato);

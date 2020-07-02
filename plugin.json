@@ -94,6 +94,16 @@
       ]
     },
     {
+      "slug": "reseq",
+      "name": "ResEQ",
+      "description": "Resonance equalizer",
+      "tags": [
+        "Equalizer",
+        "Filter",
+        "Polyphonic"
+      ]
+    },
+    {
       "slug": "tape",
       "name": "Tape",
       "description": "All-purpose tape mojo",
