@@ -39,12 +39,17 @@ struct Capacitor : Module {
         NUM_LIGHTS
     };
 
+    // module variables
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
+    int quality;
+    dsp::ClockDivider partTimeJob;
 
-    bool quality;
+    // control parameters
+    float lowpassParam;
+    float highpassParam;
 
-    // 32 bit variables
+    // global variables (as arrays in order to handle up to 16 polyphonic channels)
     struct vars32 {
         float iirHighpassA;
         float iirHighpassB;
@@ -58,21 +63,14 @@ struct Capacitor : Module {
         float iirLowpassD;
         float iirLowpassE;
         float iirLowpassF;
-
         float lowpassChase;
         float highpassChase;
-        // float wetChase;
-
         float lowpassAmount;
         float highpassAmount;
-        // float wet;
-
         float lastLowpass;
         float lastHighpass;
-        // float lastWet;
     } v32[16];
 
-    // 64 bit variables
     struct vars64 {
         double iirHighpassA;
         double iirHighpassB;
@@ -86,35 +84,32 @@ struct Capacitor : Module {
         double iirLowpassD;
         double iirLowpassE;
         double iirLowpassF;
-
         double lowpassChase;
         double highpassChase;
-        // double wetChase;
-
         double lowpassAmount;
         double highpassAmount;
-        // double wet;
-
         double lastLowpass;
         double lastHighpass;
-        // double lastWet;
     } v64[16];
 
     int count[16];
-
     long double fpNShape[16];
 
-    float A;
-    float B;
+    // part-time variables (which do not need to be updated every cycle)
+    double overallscale;
 
     Capacitor()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(LOWPASS_PARAM, 0.f, 1.f, 1.f, "Lowpass");
         configParam(HIGHPASS_PARAM, 0.f, 1.f, 0.f, "Highpass");
-        // configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
 
         quality = loadQuality();
+
+        partTimeJob.setDivision(2);
+
+        onSampleRateChange();
+        updateParams();
 
         for (int i = 0; i < 16; i++) {
             v32[i].iirHighpassA = v64[i].iirHighpassA = 0.0;
@@ -143,6 +138,15 @@ struct Capacitor : Module {
 
             fpNShape[i] = 0.0;
         }
+    }
+
+    void onSampleRateChange() override
+    {
+        float sampleRate = APP->engine->getSampleRate();
+
+        overallscale = 1.0;
+        overallscale /= 44100.0;
+        overallscale *= sampleRate;
     }
 
     void onReset() override
@@ -178,31 +182,37 @@ struct Capacitor : Module {
         resetNonJson(true);
     }
 
+    void updateParams()
+    {
+        lowpassParam = params[LOWPASS_PARAM].getValue();
+        lowpassParam += inputs[LOWPASS_CV_INPUT].getVoltage() / 5;
+        lowpassParam = clamp(lowpassParam, 0.01f, 0.99f);
+
+        highpassParam = params[HIGHPASS_PARAM].getValue();
+        highpassParam += inputs[HIGHPASS_CV_INPUT].getVoltage() / 5;
+        highpassParam = clamp(highpassParam, 0.01f, 0.99f);
+    }
+
     void processChannel32(vars32 v[], Input& input, Output& output)
     {
         if (output.isConnected()) {
 
-            // params
-            A = params[LOWPASS_PARAM].getValue();
-            A += inputs[LOWPASS_CV_INPUT].getVoltage() / 5;
-            A = clamp(A, 0.01f, 0.99f);
-
-            B = params[HIGHPASS_PARAM].getValue();
-            B += inputs[HIGHPASS_CV_INPUT].getVoltage() / 5;
-            B = clamp(B, 0.01f, 0.99f);
+            // stuff that doesn't need to be processed every cycle
+            if (partTimeJob.process()) {
+                updateParams();
+            }
 
             float lowpassSpeed;
             float highpassSpeed;
             float invLowpass;
             float invHighpass;
-
             float inputSample;
 
             // for each poly channel
             for (int i = 0, numChannels = std::max(1, input.getChannels()); i < numChannels; ++i) {
 
-                v[i].lowpassChase = pow(A, 2);
-                v[i].highpassChase = pow(B, 2);
+                v[i].lowpassChase = pow(lowpassParam, 2);
+                v[i].highpassChase = pow(highpassParam, 2);
                 //should not scale with sample rate, because values reaching 1 are important
                 //to its ability to bypass when set to max
                 lowpassSpeed = 300 / (fabs(v[i].lastLowpass - v[i].lowpassChase) + 1.0);
@@ -327,27 +337,22 @@ struct Capacitor : Module {
     {
         if (output.isConnected()) {
 
-            // params
-            A = params[LOWPASS_PARAM].getValue();
-            A += inputs[LOWPASS_CV_INPUT].getVoltage() / 5;
-            A = clamp(A, 0.01f, 0.99f);
-
-            B = params[HIGHPASS_PARAM].getValue();
-            B += inputs[HIGHPASS_CV_INPUT].getVoltage() / 5;
-            B = clamp(B, 0.01f, 0.99f);
+            // stuff that doesn't need to be processed every cycle
+            if (partTimeJob.process()) {
+                updateParams();
+            }
 
             double lowpassSpeed;
             double highpassSpeed;
             double invLowpass;
             double invHighpass;
-
             long double inputSample;
 
             // for each poly channel
             for (int i = 0, numChannels = std::max(1, inputs[IN_INPUT].getChannels()); i < numChannels; ++i) {
 
-                v[i].lowpassChase = pow(A, 2);
-                v[i].highpassChase = pow(B, 2);
+                v[i].lowpassChase = pow(lowpassParam, 2);
+                v[i].highpassChase = pow(highpassParam, 2);
                 //should not scale with sample rate, because values reaching 1 are important
                 //to its ability to bypass when set to max
                 lowpassSpeed = 300 / (fabs(v[i].lastLowpass - v[i].lowpassChase) + 1.0);
@@ -505,10 +510,10 @@ struct Capacitor : Module {
     {
         switch (quality) {
         case 1:
-            processChannel32(v32, inputs[IN_INPUT], outputs[OUT_OUTPUT]);
+            processChannel64(v64, inputs[IN_INPUT], outputs[OUT_OUTPUT]);
             break;
         default:
-            processChannel64(v64, inputs[IN_INPUT], outputs[OUT_OUTPUT]);
+            processChannel32(v32, inputs[IN_INPUT], outputs[OUT_OUTPUT]);
         }
     }
 };
@@ -542,17 +547,17 @@ struct CapacitorWidget : ModuleWidget {
         qualityLabel->text = "Quality";
         menu->addChild(qualityLabel);
 
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Eco";
+        low->module = module;
+        low->quality = 0;
+        menu->addChild(low);
+
         QualityItem* high = new QualityItem(); // high quality
         high->text = "High";
         high->module = module;
-        high->quality = 0;
+        high->quality = 1;
         menu->addChild(high);
-
-        QualityItem* low = new QualityItem(); // low quality
-        low->text = "Low";
-        low->module = module;
-        low->quality = 1;
-        menu->addChild(low);
     }
 
     CapacitorWidget(Capacitor* module)
