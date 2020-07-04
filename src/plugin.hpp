@@ -27,6 +27,15 @@ extern Model* modelVibrato;
 // sound quality settings
 void saveQuality(bool quality);
 bool loadQuality();
+void saveHighQualityAsDefault(bool highQualityAsDefault);
+bool loadHighQualityAsDefault();
+
+struct highQualityDefaultItem : MenuItem {
+    void onAction(const event::Action& e) override
+    {
+        saveHighQualityAsDefault(rightText.empty()); // implicitly toggled
+    }
+};
 
 // console types
 void saveConsoleType(int consoleType);

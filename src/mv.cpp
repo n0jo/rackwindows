@@ -18,42 +18,47 @@ See ./LICENSE.md for all licenses
 
 struct Mv : Module {
     enum ParamIds {
-        KNOBDEPTH_PARAM,
-        KNOBREGEN_PARAM,
-        KNOBBRIGHT_PARAM,
-        KNOBDRYWET_PARAM,
-        KNOBDEPTHCV_PARAM,
-        KNOBBRIGHTCV_PARAM,
-        KNOBDRYWETCV_PARAM,
-        KNOBREGENCV_PARAM,
+        DEPTH_PARAM,
+        REGEN_PARAM,
+        BRIGHT_PARAM,
+        DRYWET_PARAM,
+        DEPTH_CV_PARAM,
+        BRIGHT_CV_PARAM,
+        DRYWET_CV_PARAM,
+        REGEN_CV_PARAM,
         NUM_PARAMS
     };
     enum InputIds {
-        CVDEPTH_INPUT,
-        CVBRIGHT_INPUT,
-        CVDRYWET_INPUT,
-        CVREGEN_INPUT,
-        INPUTL_INPUT,
-        INPUTR_INPUT,
+        DEPTH_CV_INPUT,
+        BRIGHT_CV_INPUT,
+        DRYWET_CV_INPUT,
+        REGEN_CV_INPUT,
+        IN_L_INPUT,
+        IN_R_INPUT,
         NUM_INPUTS
     };
     enum OutputIds {
-        OUTPUTL_OUTPUT,
-        OUTPUTR_OUTPUT,
+        OUT_L_OUTPUT,
+        OUT_R_OUTPUT,
         NUM_OUTPUTS
     };
     enum LightIds {
         NUM_LIGHTS
     };
 
-    uint32_t fpd;
+    // module variables
+    const double gainCut = 0.03125;
+    const double gainBoost = 32.0;
+    int quality;
+    dsp::ClockDivider partTimeJob;
 
-    float A;
-    float B;
-    float C;
-    float D;
-    float E; //parameters. Always 0-1, and we scale/alter them elsewhere.
+    // control parameters
+    float depth;
+    float regeneration;
+    float brightness;
+    float drywet;
 
+    // global variables
     double aAL[15150];
     double aBL[14618];
     double aCL[14358];
@@ -194,23 +199,28 @@ struct Mv : Module {
     int alpY, delayY;
     int alpZ, delayZ;
 
+    uint32_t fpd;
+
+    // part-time variables (which do not need to be updated every cycle)
+
     Mv()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(KNOBDEPTH_PARAM, 0.f, 1.f, 0.5f, "Depth");
-        configParam(KNOBREGEN_PARAM, 0.f, 1.f, 0.5f, "Regeneration");
-        configParam(KNOBBRIGHT_PARAM, 0.f, 1.f, 0.5f, "Brightness");
-        configParam(KNOBDRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
-        configParam(KNOBDEPTHCV_PARAM, -1.f, 1.f, 0.f, "Depth CV");
-        configParam(KNOBBRIGHTCV_PARAM, -1.f, 1.f, 0.f, "Brightness CV");
-        configParam(KNOBDRYWETCV_PARAM, -1.f, 1.f, 0.f, "Dry/Wet CV");
-        configParam(KNOBREGENCV_PARAM, -1.f, 1.f, 0.f, "Regeneration CV");
+        configParam(DEPTH_PARAM, 0.12f, 1.f, 0.5f, "Depth");
+        configParam(REGEN_PARAM, 0.f, 1.f, 0.5f, "Regeneration");
+        configParam(BRIGHT_PARAM, 0.f, 1.f, 0.5f, "Brightness");
+        configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
+        configParam(DEPTH_CV_PARAM, -1.f, 1.f, 0.f, "Depth CV");
+        configParam(BRIGHT_CV_PARAM, -1.f, 1.f, 0.f, "Brightness CV");
+        configParam(DRYWET_CV_PARAM, -1.f, 1.f, 0.f, "Dry/Wet CV");
+        configParam(REGEN_CV_PARAM, -1.f, 1.f, 0.f, "Regeneration CV");
 
-        // TODO: figure out why default value isn't set in configParam)
-        params[KNOBDEPTH_PARAM].setValue(0.5f);
-        params[KNOBREGEN_PARAM].setValue(0.5f);
-        params[KNOBBRIGHT_PARAM].setValue(0.5f);
-        params[KNOBDRYWET_PARAM].setValue(1.f);
+        quality = 0;
+        quality = loadQuality();
+
+        partTimeJob.setDivision(64);
+
+        updateParams();
 
         int count;
         for (count = 0; count < 15149; count++) {
@@ -429,34 +439,77 @@ struct Mv : Module {
         fpd = 17;
     }
 
+    void onSampleRateChange() override
+    {
+    }
+
+    void onReset() override
+    {
+        resetNonJson(false);
+    }
+
+    void resetNonJson(bool recurseNonJson)
+    {
+    }
+
+    void onRandomize() override
+    {
+    }
+
+    json_t* dataToJson() override
+    {
+        json_t* rootJ = json_object();
+
+        // quality
+        json_object_set_new(rootJ, "quality", json_integer(quality));
+
+        return rootJ;
+    }
+
+    void dataFromJson(json_t* rootJ) override
+    {
+        // quality
+        json_t* qualityJ = json_object_get(rootJ, "quality");
+        if (qualityJ)
+            quality = json_integer_value(qualityJ);
+
+        resetNonJson(true);
+    }
+
+    void updateParams()
+    {
+        depth = inputs[DEPTH_CV_INPUT].getVoltage() * params[DEPTH_CV_PARAM].getValue() / 5;
+        depth += params[DEPTH_PARAM].getValue();
+        depth = clamp(depth, 0.01f, 0.99f);
+
+        brightness = inputs[BRIGHT_CV_INPUT].getVoltage() * params[BRIGHT_CV_PARAM].getValue() / 5;
+        brightness += params[BRIGHT_PARAM].getValue();
+        brightness = clamp(brightness, 0.01f, 0.99f);
+
+        regeneration = inputs[REGEN_CV_INPUT].getVoltage() * params[REGEN_CV_PARAM].getValue() / 5;
+        regeneration += params[REGEN_PARAM].getValue();
+        regeneration = clamp(regeneration, 0.01f, 0.99f);
+
+        drywet = inputs[DRYWET_CV_INPUT].getVoltage() * params[DRYWET_CV_PARAM].getValue() / 5;
+        drywet += params[DRYWET_PARAM].getValue();
+        drywet = clamp(drywet, 0.f, 1.f);
+    }
+
     void process(const ProcessArgs& args) override
     {
-        if (outputs[OUTPUTL_OUTPUT].isConnected() || outputs[OUTPUTR_OUTPUT].isConnected()) {
+        if (outputs[OUT_L_OUTPUT].isConnected() || outputs[OUT_R_OUTPUT].isConnected()) {
 
-            // get control parameters
-            A = inputs[CVDEPTH_INPUT].getVoltage() * params[KNOBDEPTHCV_PARAM].getValue() / 5;
-            A += params[KNOBDEPTH_PARAM].getValue();
-            A = clamp(A, 0.01f, 0.99f);
-
-            B = inputs[CVBRIGHT_INPUT].getVoltage() * params[KNOBBRIGHTCV_PARAM].getValue() / 5;
-            B += params[KNOBBRIGHT_PARAM].getValue();
-            B = clamp(A, 0.01f, 0.99f);
-
-            C = inputs[CVREGEN_INPUT].getVoltage() * params[KNOBREGENCV_PARAM].getValue() / 5;
-            C += params[KNOBREGEN_PARAM].getValue();
-            C = clamp(C, 0.01f, 0.99f);
-
-            // D = 1.0; // unused, no output control in module
-
-            E = inputs[CVDRYWET_INPUT].getVoltage() * params[KNOBDRYWETCV_PARAM].getValue() / 5;
-            E += params[KNOBDRYWET_PARAM].getValue();
-            E = clamp(E, 0.f, 1.f);
+            if (partTimeJob.process()) {
+                // stuff that doesn't need to be processed every cycle
+                updateParams();
+            }
 
             int allpasstemp;
             double avgtemp;
-            int stage = A * 27.0;
-            int damp = (1.0 - B) * stage;
-            double feedbacklevel = C;
+            int stage = depth * 27.0;
+            int damp = (1.0 - brightness) * stage;
+            double feedbacklevel = regeneration;
+            double wet = drywet;
 
             //we're forcing even the feedback level to be Midiverb-ized
             if (feedbacklevel <= 0.0625)
@@ -471,65 +524,66 @@ struct Mv : Module {
                 feedbacklevel = 0.5; //-6db
             if (feedbacklevel > 0.99)
                 feedbacklevel = 1.0;
-            double wet = E;
 
             // get inputs
-            long double inputSampleL = inputs[INPUTL_INPUT].getVoltage();
-            long double inputSampleR = inputs[INPUTR_INPUT].getVoltage();
+            long double inputSampleL = inputs[IN_L_INPUT].getVoltage();
+            long double inputSampleR = inputs[IN_R_INPUT].getVoltage();
 
-            //for live air, we always apply the dither noise. Then, if our result is
-            //effectively digital black, we'll subtract it again. We want a 'air' hiss
-            static int noisesourceL = 0;
-            static int noisesourceR = 850010;
-            int residue;
-            double applyresidue;
+            // pad gain
+            inputSampleL *= gainCut;
+            inputSampleR *= gainCut;
 
-            noisesourceL = noisesourceL % 1700021;
-            noisesourceL++;
-            residue = noisesourceL * noisesourceL;
-            residue = residue % 170003;
-            residue *= residue;
-            residue = residue % 17011;
-            residue *= residue;
-            residue = residue % 1709;
-            residue *= residue;
-            residue = residue % 173;
-            residue *= residue;
-            residue = residue % 17;
-            applyresidue = residue;
-            applyresidue *= 0.00000001;
-            applyresidue *= 0.00000001;
-            inputSampleL += applyresidue;
-            if (inputSampleL < 1.2e-38 && -inputSampleL < 1.2e-38) {
-                inputSampleL -= applyresidue;
-            }
+            if (quality == 1) {
+                //for live air, we always apply the dither noise. Then, if our result is
+                //effectively digital black, we'll subtract it again. We want a 'air' hiss
+                static int noisesourceL = 0;
+                static int noisesourceR = 850010;
+                int residue;
+                double applyresidue;
 
-            noisesourceR = noisesourceR % 1700021;
-            noisesourceR++;
-            residue = noisesourceR * noisesourceR;
-            residue = residue % 170003;
-            residue *= residue;
-            residue = residue % 17011;
-            residue *= residue;
-            residue = residue % 1709;
-            residue *= residue;
-            residue = residue % 173;
-            residue *= residue;
-            residue = residue % 17;
-            applyresidue = residue;
-            applyresidue *= 0.00000001;
-            applyresidue *= 0.00000001;
-            inputSampleR += applyresidue;
-            if (inputSampleR < 1.2e-38 && -inputSampleR < 1.2e-38) {
-                inputSampleR -= applyresidue;
+                noisesourceL = noisesourceL % 1700021;
+                noisesourceL++;
+                residue = noisesourceL * noisesourceL;
+                residue = residue % 170003;
+                residue *= residue;
+                residue = residue % 17011;
+                residue *= residue;
+                residue = residue % 1709;
+                residue *= residue;
+                residue = residue % 173;
+                residue *= residue;
+                residue = residue % 17;
+                applyresidue = residue;
+                applyresidue *= 0.00000001;
+                applyresidue *= 0.00000001;
+                inputSampleL += applyresidue;
+                if (inputSampleL < 1.2e-38 && -inputSampleL < 1.2e-38) {
+                    inputSampleL -= applyresidue;
+                }
+
+                noisesourceR = noisesourceR % 1700021;
+                noisesourceR++;
+                residue = noisesourceR * noisesourceR;
+                residue = residue % 170003;
+                residue *= residue;
+                residue = residue % 17011;
+                residue *= residue;
+                residue = residue % 1709;
+                residue *= residue;
+                residue = residue % 173;
+                residue *= residue;
+                residue = residue % 17;
+                applyresidue = residue;
+                applyresidue *= 0.00000001;
+                applyresidue *= 0.00000001;
+                inputSampleR += applyresidue;
+                if (inputSampleR < 1.2e-38 && -inputSampleR < 1.2e-38) {
+                    inputSampleR -= applyresidue;
+                }
             }
 
             double drySampleL = inputSampleL;
             double drySampleR = inputSampleR;
-
-            // pad gain massively to prevent distortion
-            inputSampleL *= 0.01;
-            inputSampleR *= 0.01;
 
             inputSampleL += feedbackL;
             inputSampleR += feedbackR;
@@ -1363,39 +1417,80 @@ struct Mv : Module {
             inputSampleL = asin(inputSampleL);
             inputSampleR = asin(inputSampleR);
 
-            // bring gain back up
-            inputSampleL *= 100;
-            inputSampleR *= 100;
-
             //Dry/Wet control
             if (wet != 1.0) {
                 inputSampleL = (inputSampleL * wet) + (drySampleL * (1.0 - wet));
                 inputSampleR = (inputSampleR * wet) + (drySampleR * (1.0 - wet));
             }
 
-            //begin 64 bit stereo floating point dither
-            int expon;
-            frexp((double)inputSampleL, &expon);
-            fpd ^= fpd << 13;
-            fpd ^= fpd >> 17;
-            fpd ^= fpd << 5;
-            inputSampleL += static_cast<int32_t>(fpd) * 1.110223024625156e-44L * pow(2, expon + 62);
-            frexp((double)inputSampleR, &expon);
-            fpd ^= fpd << 13;
-            fpd ^= fpd >> 17;
-            fpd ^= fpd << 5;
-            inputSampleR += static_cast<int32_t>(fpd) * 1.110223024625156e-44L * pow(2, expon + 62);
-            //end 64 bit stereo floating point dither
+            // bring gain back up
+            inputSampleL *= gainBoost;
+            inputSampleR *= gainBoost;
 
-            outputs[OUTPUTL_OUTPUT].setVoltage(inputSampleL);
-            outputs[OUTPUTR_OUTPUT].setVoltage(inputSampleR);
-            // outputs[OUTPUTL_OUTPUT].setVoltage(tanhDriveSignal(inputSampleL * 0.111f, 0.95f) * 9.999f);
-            // outputs[OUTPUTR_OUTPUT].setVoltage(tanhDriveSignal(inputSampleR * 0.111f, 0.95f) * 9.999f);
+            if (quality == 1) {
+                //begin 64 bit stereo floating point dither
+                int expon;
+                frexp((double)inputSampleL, &expon);
+                fpd ^= fpd << 13;
+                fpd ^= fpd >> 17;
+                fpd ^= fpd << 5;
+                inputSampleL += static_cast<int32_t>(fpd) * 1.110223024625156e-44L * pow(2, expon + 62);
+                frexp((double)inputSampleR, &expon);
+                fpd ^= fpd << 13;
+                fpd ^= fpd >> 17;
+                fpd ^= fpd << 5;
+                inputSampleR += static_cast<int32_t>(fpd) * 1.110223024625156e-44L * pow(2, expon + 62);
+                //end 64 bit stereo floating point dither
+            }
+
+            outputs[OUT_L_OUTPUT].setVoltage(inputSampleL);
+            outputs[OUT_R_OUTPUT].setVoltage(inputSampleR);
         }
     }
 };
 
 struct MvWidget : ModuleWidget {
+
+    // quality item
+    struct QualityItem : MenuItem {
+        Mv* module;
+        int quality;
+
+        void onAction(const event::Action& e) override
+        {
+            module->quality = quality;
+        }
+
+        void step() override
+        {
+            rightText = (module->quality == quality) ? "✔" : "";
+        }
+    };
+
+    void appendContextMenu(Menu* menu) override
+    {
+        Mv* module = dynamic_cast<Mv*>(this->module);
+        assert(module);
+
+        menu->addChild(new MenuSeparator()); // separator
+
+        MenuLabel* qualityLabel = new MenuLabel(); // menu label
+        qualityLabel->text = "Quality";
+        menu->addChild(qualityLabel);
+
+        QualityItem* high = new QualityItem(); // high quality
+        high->text = "High";
+        high->module = module;
+        high->quality = 1;
+        menu->addChild(high);
+
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Low";
+        low->module = module;
+        low->quality = 0;
+        menu->addChild(low);
+    }
+
     MvWidget(Mv* module)
     {
         setModule(module);
@@ -1408,26 +1503,26 @@ struct MvWidget : ModuleWidget {
         addChild(createWidget<ScrewBlack>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         // knobs
-        addParam(createParamCentered<RwKnobLargeDark>(Vec(37.5, 75.0), module, Mv::KNOBDEPTH_PARAM)); // Depth
-        addParam(createParamCentered<RwKnobLargeDark>(Vec(112.5, 75.0), module, Mv::KNOBREGEN_PARAM)); // Regeneration
-        addParam(createParamCentered<RwKnobMediumDark>(Vec(56.3, 140.0), module, Mv::KNOBBRIGHT_PARAM)); // Brightness
-        addParam(createParamCentered<RwKnobSmallDark>(Vec(90, 190.0), module, Mv::KNOBDRYWET_PARAM)); // Dry/Wet
-        addParam(createParamCentered<RwKnobTrimpot>(Vec(22.5, 215.0), module, Mv::KNOBDEPTHCV_PARAM)); // CV Depth
-        addParam(createParamCentered<RwKnobTrimpot>(Vec(56.25, 225.0), module, Mv::KNOBBRIGHTCV_PARAM)); // CV Brightness
-        addParam(createParamCentered<RwKnobTrimpot>(Vec(90.0, 235.0), module, Mv::KNOBDRYWETCV_PARAM)); // CV Dry/Wet
-        addParam(createParamCentered<RwKnobTrimpot>(Vec(123.75, 245.0), module, Mv::KNOBREGENCV_PARAM)); // CV Regeneration
+        addParam(createParamCentered<RwKnobLargeDark>(Vec(37.5, 75.0), module, Mv::DEPTH_PARAM)); // Depth
+        addParam(createParamCentered<RwKnobLargeDark>(Vec(112.5, 75.0), module, Mv::REGEN_PARAM)); // Regeneration
+        addParam(createParamCentered<RwKnobMediumDark>(Vec(56.3, 140.0), module, Mv::BRIGHT_PARAM)); // Brightness
+        addParam(createParamCentered<RwKnobSmallDark>(Vec(90, 190.0), module, Mv::DRYWET_PARAM)); // Dry/Wet
+        addParam(createParamCentered<RwKnobTrimpot>(Vec(22.5, 215.0), module, Mv::DEPTH_CV_PARAM)); // CV Depth
+        addParam(createParamCentered<RwKnobTrimpot>(Vec(56.25, 225.0), module, Mv::BRIGHT_CV_PARAM)); // CV Brightness
+        addParam(createParamCentered<RwKnobTrimpot>(Vec(90.0, 235.0), module, Mv::DRYWET_CV_PARAM)); // CV Dry/Wet
+        addParam(createParamCentered<RwKnobTrimpot>(Vec(123.75, 245.0), module, Mv::REGEN_CV_PARAM)); // CV Regeneration
 
         // inputs
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(22.5, 285.0), module, Mv::CVDEPTH_INPUT)); // CV Depth
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(56.25, 285.0), module, Mv::CVBRIGHT_INPUT)); // CV Brightness
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(90.0, 285.0), module, Mv::CVDRYWET_INPUT)); // CV Dry/Wet
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(123.75, 285.0), module, Mv::CVREGEN_INPUT)); // CV Regeneration
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(22.5, 325.0), module, Mv::INPUTL_INPUT)); // In L
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(56.25, 325.0), module, Mv::INPUTR_INPUT)); // In R
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(22.5, 285.0), module, Mv::DEPTH_CV_INPUT)); // CV Depth
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(56.25, 285.0), module, Mv::BRIGHT_CV_INPUT)); // CV Brightness
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(90.0, 285.0), module, Mv::DRYWET_CV_INPUT)); // CV Dry/Wet
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(123.75, 285.0), module, Mv::REGEN_CV_INPUT)); // CV Regeneration
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(22.5, 325.0), module, Mv::IN_L_INPUT)); // In L
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(56.25, 325.0), module, Mv::IN_R_INPUT)); // In R
 
         // outputs
-        addOutput(createOutputCentered<RwPJ301MPort>(Vec(90.0, 325.0), module, Mv::OUTPUTL_OUTPUT)); // Out L
-        addOutput(createOutputCentered<RwPJ301MPort>(Vec(123.75, 325.0), module, Mv::OUTPUTR_OUTPUT)); // Out R
+        addOutput(createOutputCentered<RwPJ301MPort>(Vec(90.0, 325.0), module, Mv::OUT_L_OUTPUT)); // Out L
+        addOutput(createOutputCentered<RwPJ301MPort>(Vec(123.75, 325.0), module, Mv::OUT_R_OUTPUT)); // Out R
     }
 };
 

@@ -66,6 +66,46 @@ bool loadQuality()
     return ret;
 }
 
+void saveHighQualityAsDefault(bool highQualityAsDefault)
+{
+    json_t* settingsJ = json_object();
+    json_object_set_new(settingsJ, "highQualityAsDefault", json_boolean(highQualityAsDefault));
+    std::string settingsFilename = asset::user("Rackwindows.json");
+    FILE* file = fopen(settingsFilename.c_str(), "w");
+    if (file) {
+        json_dumpf(settingsJ, file, JSON_INDENT(2) | JSON_REAL_PRECISION(9));
+        fclose(file);
+    }
+    json_decref(settingsJ);
+}
+
+// https://github.com/MarcBoule/Geodesics/blob/master/src/Geodesics.cpp
+bool loadHighQualityAsDefault()
+{
+    bool ret = false;
+    std::string settingsFilename = asset::user("Rackwindows.json");
+    FILE* file = fopen(settingsFilename.c_str(), "r");
+    if (!file) {
+        saveHighQualityAsDefault(false);
+        return ret;
+    }
+    json_error_t error;
+    json_t* settingsJ = json_loadf(file, 0, &error);
+    if (!settingsJ) {
+        // invalid setting json file
+        fclose(file);
+        saveHighQualityAsDefault(false);
+        return ret;
+    }
+    json_t* highQualityAsDefaultJ = json_object_get(settingsJ, "highQualityAsDefault");
+    if (highQualityAsDefaultJ)
+        ret = json_boolean_value(highQualityAsDefaultJ);
+
+    fclose(file);
+    json_decref(settingsJ);
+    return ret;
+}
+
 // console type
 void saveConsoleType(int consoleType)
 {
