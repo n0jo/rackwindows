@@ -42,12 +42,19 @@ struct Chorus : Module {
         NUM_LIGHTS
     };
 
+    // module variables
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
-
+    int quality;
     bool isEnsemble;
+    dsp::ClockDivider partTimeJob;
 
-    // global variables for potentially 16 poly channels
+    // control parameters
+    float speedParam;
+    float rangeParam;
+    float drywetParam;
+
+    // global variables (as arrays in order to handle up to 16 polyphonic channels)
     const static int totalsamples = 16386;
     float d[16][totalsamples];
     double sweepL[16];
@@ -67,9 +74,8 @@ struct Chorus : Module {
     long double fpNShapeL[16];
     long double fpNShapeR[16];
 
-    float A;
-    float B;
-    float C;
+    // part-time variables (which do not need to be updated every cycle)
+    double overallscale;
 
     Chorus()
     {
@@ -79,7 +85,14 @@ struct Chorus : Module {
         configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
         configParam(ENSEMBLE_PARAM, 0.f, 1.f, 0.f, "Ensemble");
 
+        quality = 1;
+        quality = loadQuality();
         isEnsemble = false;
+
+        partTimeJob.setDivision(2);
+
+        onSampleRateChange();
+        updateParams();
 
         for (int i = 0; i < 16; i++) {
             for (int count = 0; count < totalsamples - 1; count++) {
@@ -105,13 +118,64 @@ struct Chorus : Module {
         //this is reset: values being initialized only once. Startup values, whatever they are.
     }
 
-    void processChannel(Input& input, Output& output, float A, float B, float C, float sampleRate, double sweep[], int gcount[], double airPrev[], double airEven[], double airOdd[], double airFactor[], bool fpFlip[], long double fpNShape[])
+    void onSampleRateChange() override
+    {
+        float sampleRate = APP->engine->getSampleRate();
+
+        overallscale = 1.0;
+        overallscale /= 44100.0;
+        overallscale *= sampleRate;
+    }
+
+    void onReset() override
+    {
+        resetNonJson(false);
+    }
+
+    void resetNonJson(bool recurseNonJson)
+    {
+    }
+
+    void onRandomize() override
+    {
+    }
+
+    json_t* dataToJson() override
+    {
+        json_t* rootJ = json_object();
+
+        // quality
+        json_object_set_new(rootJ, "quality", json_integer(quality));
+
+        return rootJ;
+    }
+
+    void dataFromJson(json_t* rootJ) override
+    {
+        // quality
+        json_t* qualityJ = json_object_get(rootJ, "quality");
+        if (qualityJ)
+            quality = json_integer_value(qualityJ);
+
+        resetNonJson(true);
+    }
+
+    void updateParams()
+    {
+        speedParam = params[SPEED_PARAM].getValue();
+        speedParam += inputs[SPEED_CV_INPUT].getVoltage() / 5;
+        speedParam = clamp(speedParam, 0.01f, 0.99f);
+
+        rangeParam = params[RANGE_PARAM].getValue();
+        rangeParam += inputs[RANGE_CV_INPUT].getVoltage() / 5;
+        rangeParam = clamp(rangeParam, 0.01f, 0.99f);
+
+        drywetParam = params[DRYWET_PARAM].getValue();
+    }
+
+    void processChannel(Input& input, Output& output, double sweep[], int gcount[], double airPrev[], double airEven[], double airOdd[], double airFactor[], bool fpFlip[], long double fpNShape[])
     {
         if (input.isConnected()) {
-
-            double overallscale = 1.0;
-            overallscale /= 44100.0;
-            overallscale *= sampleRate;
 
             double speed = 0.0;
             double range = 0.0;
@@ -119,8 +183,8 @@ struct Chorus : Module {
             int loopLimit = (int)(totalsamples * 0.499);
 
             if (isEnsemble) {
-                speed = pow(A, 3) * 0.001;
-                range = pow(B, 3) * loopLimit * 0.12;
+                speed = pow(speedParam, 3) * 0.001;
+                range = pow(rangeParam, 3) * loopLimit * 0.12;
                 // start[4];
 
                 //now we'll precalculate some stuff that needn't be in every sample
@@ -129,12 +193,12 @@ struct Chorus : Module {
                 start[2] = range * 3;
                 start[3] = range * 4;
             } else {
-                speed = pow(A, 4) * 0.001;
-                range = pow(B, 4) * loopLimit * 0.499;
+                speed = pow(speedParam, 4) * 0.001;
+                range = pow(rangeParam, 4) * loopLimit * 0.499;
             }
 
             int count;
-            double wet = C;
+            double wet = drywetParam;
             double modulation = range * wet;
             double dry = 1.0 - wet;
             double tupi = 3.141592653589793238 * 2.0;
@@ -157,30 +221,33 @@ struct Chorus : Module {
                 // pad gain
                 inputSample *= gainCut;
 
-                if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
-                    static int noisesource = 0;
-                    //this declares a variable before anything else is compiled. It won't keep assigning
-                    //it to 0 for every sample, it's as if the declaration doesn't exist in this context,
-                    //but it lets me add this denormalization fix in a single place rather than updating
-                    //it in three different locations. The variable isn't thread-safe but this is only
-                    //a random seed and we can share it with whatever.
-                    noisesource = noisesource % 1700021;
-                    noisesource++;
-                    int residue = noisesource * noisesource;
-                    residue = residue % 170003;
-                    residue *= residue;
-                    residue = residue % 17011;
-                    residue *= residue;
-                    residue = residue % 1709;
-                    residue *= residue;
-                    residue = residue % 173;
-                    residue *= residue;
-                    residue = residue % 17;
-                    double applyresidue = residue;
-                    applyresidue *= 0.00000001;
-                    applyresidue *= 0.00000001;
-                    inputSample = applyresidue;
+                if (quality == 1) {
+                    if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
+                        static int noisesource = 0;
+                        //this declares a variable before anything else is compiled. It won't keep assigning
+                        //it to 0 for every sample, it's as if the declaration doesn't exist in this context,
+                        //but it lets me add this denormalization fix in a single place rather than updating
+                        //it in three different locations. The variable isn't thread-safe but this is only
+                        //a random seed and we can share it with whatever.
+                        noisesource = noisesource % 1700021;
+                        noisesource++;
+                        int residue = noisesource * noisesource;
+                        residue = residue % 170003;
+                        residue *= residue;
+                        residue = residue % 17011;
+                        residue *= residue;
+                        residue = residue % 1709;
+                        residue *= residue;
+                        residue = residue % 173;
+                        residue *= residue;
+                        residue = residue % 17;
+                        double applyresidue = residue;
+                        applyresidue *= 0.00000001;
+                        applyresidue *= 0.00000001;
+                        inputSample = applyresidue;
+                    }
                 }
+
                 drySample = inputSample;
 
                 airFactor[i] = airPrev[i] - inputSample;
@@ -264,13 +331,15 @@ struct Chorus : Module {
                 }
                 fpFlip[i] = !fpFlip[i];
 
-                //stereo 32 bit dither, made small and tidy.
-                int expon;
-                frexpf((float)inputSample, &expon);
-                long double dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
-                inputSample += (dither - fpNShape[i]);
-                fpNShape[i] = dither;
-                //end 32 bit dither
+                if (quality == 1) {
+                    //stereo 32 bit dither, made small and tidy.
+                    int expon;
+                    frexpf((float)inputSample, &expon);
+                    long double dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
+                    inputSample += (dither - fpNShape[i]);
+                    fpNShape[i] = dither;
+                    //end 32 bit dither
+                }
 
                 // bring gain back up
                 inputSample *= gainBoost;
@@ -285,21 +354,15 @@ struct Chorus : Module {
     {
         if (outputs[OUT_L_OUTPUT].isConnected() || outputs[OUT_R_OUTPUT].isConnected()) {
 
-            // params
-            A = params[SPEED_PARAM].getValue();
-            A += inputs[SPEED_CV_INPUT].getVoltage() / 5;
-            A = clamp(A, 0.01f, 0.99f);
-
-            B = params[RANGE_PARAM].getValue();
-            B += inputs[RANGE_CV_INPUT].getVoltage() / 5;
-            B = clamp(B, 0.01f, 0.99f);
-
-            C = params[DRYWET_PARAM].getValue();
+            if (partTimeJob.process()) {
+                // stuff that doesn't need to be processed every cycle
+                updateParams();
+            }
 
             // process L
-            processChannel(inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT], A, B, C, args.sampleRate, sweepL, gcountL, airPrevL, airEvenL, airOddL, airFactorL, fpFlipL, fpNShapeL);
+            processChannel(inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT], sweepL, gcountL, airPrevL, airEvenL, airOddL, airFactorL, fpFlipL, fpNShapeL);
             // process R
-            processChannel(inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT], A, B, C, args.sampleRate, sweepR, gcountR, airPrevR, airEvenR, airOddR, airFactorR, fpFlipR, fpNShapeR);
+            processChannel(inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT], sweepR, gcountR, airPrevR, airEvenR, airOddR, airFactorR, fpFlipR, fpNShapeR);
         }
 
         // ensemble light
@@ -309,6 +372,47 @@ struct Chorus : Module {
 };
 
 struct ChorusWidget : ModuleWidget {
+
+    // quality item
+    struct QualityItem : MenuItem {
+        Chorus* module;
+        int quality;
+
+        void onAction(const event::Action& e) override
+        {
+            module->quality = quality;
+        }
+
+        void step() override
+        {
+            rightText = (module->quality == quality) ? "✔" : "";
+        }
+    };
+
+    void appendContextMenu(Menu* menu) override
+    {
+        Chorus* module = dynamic_cast<Chorus*>(this->module);
+        assert(module);
+
+        menu->addChild(new MenuSeparator()); // separator
+
+        MenuLabel* qualityLabel = new MenuLabel(); // menu label
+        qualityLabel->text = "Quality";
+        menu->addChild(qualityLabel);
+
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Eco";
+        low->module = module;
+        low->quality = 0;
+        menu->addChild(low);
+
+        QualityItem* high = new QualityItem(); // high quality
+        high->text = "High";
+        high->module = module;
+        high->quality = 1;
+        menu->addChild(high);
+    }
+
     ChorusWidget(Chorus* module)
     {
         setModule(module);
