@@ -48,39 +48,49 @@ struct Vibrato : Module {
         NUM_LIGHTS
     };
 
+    // module variables
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
+    int quality;
+    dsp::ClockDivider partTimeJob;
+    dsp::PulseGenerator eocPulse, eocFmPulse;
+    // const float triggerLength = 0.0001f;
+    // const float triggerThreshold = 0.0005f;
+    // bool triggerEoc = false;
+    // bool triggerEocFm = false;
+    // float speedLight = 0.0f;
+    // float speedFmLight = 0.0f;
+    // const float lightLambda = 0.075f;
 
+    // control parameters
+    float speedParam;
+    float depthParam;
+    float fmSpeedParam;
+    float fmDepthParam;
+    float invwetParam;
+
+    // global variables (as arrays in order to handle up to 16 polyphonic channels)
     double p[16][16386]; //this is processed, not raw incoming samples
     double sweep[16];
     double sweepB[16];
     int gcount[16];
-
     double airPrev[16];
     double airEven[16];
     double airOdd[16];
     double airFactor[16];
-
     bool flip[16];
-
     uint32_t fpd[16];
 
-    float A;
-    float B;
-    float C;
-    float D;
-    float E; //parameters. Always 0-1, and we scale/alter them elsewhere.
+    // part-time variables (which do not need to be updated every cycle)
+    double overallscale;
+    double speed;
+    double depth;
+    double speedB;
+    double depthB;
+    double wet;
 
-    // EOC
-    dsp::PulseGenerator eocPulse, eocFmPulse;
-    bool triggerEoc = false;
-    bool triggerEocFm = false;
-    float triggerLength = 0.0001f;
-    float triggerThreshold = 0.0005f;
-
-    float speedLight = 0.0f;
-    float speedFmLight = 0.0f;
-    const float lightLambda = 0.075f;
+    // constants
+    const double tupi = 3.141592653589793238 * 2.0;
 
     Vibrato()
     {
@@ -90,6 +100,13 @@ struct Vibrato : Module {
         configParam(DEPTH_PARAM, 0.f, 1.f, 0.f, "Depth");
         configParam(FMDEPTH_PARAM, 0.f, 1.f, 0.f, "FM Depth");
         configParam(INVWET_PARAM, 0.f, 1.f, 0.5f, "Inv/Wet");
+
+        quality = loadQuality();
+
+        partTimeJob.setDivision(2);
+
+        onSampleRateChange();
+        updateParams();
 
         for (int i = 0; i < 16; i++) {
             for (int count = 0; count < 16385; count++) {
@@ -109,36 +126,85 @@ struct Vibrato : Module {
         }
     }
 
+    void onSampleRateChange() override
+    {
+        float sampleRate = APP->engine->getSampleRate();
+
+        overallscale = 1.0;
+        overallscale /= 44100.0;
+        overallscale *= sampleRate;
+    }
+
+    void onReset() override
+    {
+        resetNonJson(false);
+    }
+
+    void resetNonJson(bool recurseNonJson)
+    {
+    }
+
+    void onRandomize() override
+    {
+    }
+
+    json_t* dataToJson() override
+    {
+        json_t* rootJ = json_object();
+
+        // quality
+        json_object_set_new(rootJ, "quality", json_integer(quality));
+
+        return rootJ;
+    }
+
+    void dataFromJson(json_t* rootJ) override
+    {
+        // quality
+        json_t* qualityJ = json_object_get(rootJ, "quality");
+        if (qualityJ)
+            quality = json_integer_value(qualityJ);
+
+        resetNonJson(true);
+    }
+
+    void updateParams()
+    {
+        speedParam = params[SPEED_PARAM].getValue();
+        speedParam += inputs[SPEED_CV_INPUT].getVoltage() / 5;
+        speedParam = clamp(speedParam, 0.01f, 0.99f);
+
+        depthParam = params[DEPTH_PARAM].getValue();
+        depthParam += inputs[DEPTH_CV_INPUT].getVoltage() / 5;
+        depthParam = clamp(depthParam, 0.01f, 0.99f);
+
+        fmSpeedParam = params[FMSPEED_PARAM].getValue();
+        fmSpeedParam += inputs[FMSPEED_CV_INPUT].getVoltage() / 5;
+        fmSpeedParam = clamp(fmSpeedParam, 0.01f, 0.99f);
+
+        fmDepthParam = params[FMDEPTH_PARAM].getValue();
+        fmDepthParam += inputs[FMDEPTH_CV_INPUT].getVoltage() / 5;
+        fmDepthParam = clamp(fmDepthParam, 0.01f, 0.99f);
+
+        invwetParam = params[INVWET_PARAM].getValue();
+        invwetParam += inputs[INVWET_CV_INPUT].getVoltage() / 5;
+        invwetParam = clamp(invwetParam, 0.01f, 0.99f);
+
+        speed = pow(0.1 + speedParam, 6);
+        depth = (pow(depthParam, 3) / sqrt(speed)) * 4.0;
+        speedB = pow(0.1 + fmSpeedParam, 6);
+        depthB = pow(fmDepthParam, 3) / sqrt(speedB);
+        wet = (invwetParam * 2.0) - 1.0; //note: inv/dry/wet
+    }
+
     void process(const ProcessArgs& args) override
     {
         if (outputs[OUT_OUTPUT].isConnected() || outputs[EOC_OUTPUT].isConnected() || outputs[EOC_FM_OUTPUT].isConnected()) {
 
-            A = params[SPEED_PARAM].getValue();
-            A += inputs[SPEED_CV_INPUT].getVoltage() / 5;
-            A = clamp(A, 0.01f, 0.99f);
-
-            B = params[DEPTH_PARAM].getValue();
-            B += inputs[DEPTH_CV_INPUT].getVoltage() / 5;
-            B = clamp(B, 0.01f, 0.99f);
-
-            C = params[FMSPEED_PARAM].getValue();
-            C += inputs[FMSPEED_CV_INPUT].getVoltage() / 5;
-            C = clamp(C, 0.01f, 0.99f);
-
-            D = params[FMDEPTH_PARAM].getValue();
-            D += inputs[FMDEPTH_CV_INPUT].getVoltage() / 5;
-            D = clamp(D, 0.01f, 0.99f);
-
-            E = params[INVWET_PARAM].getValue();
-            E += inputs[INVWET_CV_INPUT].getVoltage() / 5;
-            E = clamp(E, 0.01f, 0.99f);
-
-            double speed = pow(0.1 + A, 6);
-            double depth = (pow(B, 3) / sqrt(speed)) * 4.0;
-            double speedB = pow(0.1 + C, 6);
-            double depthB = pow(D, 3) / sqrt(speedB);
-            double tupi = 3.141592653589793238 * 2.0;
-            double wet = (E * 2.0) - 1.0; //note: inv/dry/wet
+            // stuff that doesn't need to be processed every cycle
+            if (partTimeJob.process()) {
+                updateParams();
+            }
 
             // number of polyphonic channels
             int numChannels = inputs[IN_INPUT].getChannels();
@@ -152,8 +218,10 @@ struct Vibrato : Module {
                 // pad gain
                 inputSample *= gainCut;
 
-                if (fabs(inputSample) < 1.18e-37)
-                    inputSample = fpd[i] * 1.18e-37;
+                if (quality == 1) {
+                    if (fabs(inputSample) < 1.18e-37)
+                        inputSample = fpd[i] * 1.18e-37;
+                }
 
                 double drySample = inputSample;
 
@@ -211,14 +279,16 @@ struct Vibrato : Module {
                     inputSample = (inputSample * wet) + (drySample * (1.0 - fabs(wet)));
                 }
 
-                //begin 32 bit stereo floating point dither
-                int expon;
-                frexpf((float)inputSample, &expon);
-                fpd[i] ^= fpd[i] << 13;
-                fpd[i] ^= fpd[i] >> 17;
-                fpd[i] ^= fpd[i] << 5;
-                inputSample += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
-                //end 32 bit stereo floating point dither
+                if (quality == 1) {
+                    //begin 32 bit stereo floating point dither
+                    int expon;
+                    frexpf((float)inputSample, &expon);
+                    fpd[i] ^= fpd[i] << 13;
+                    fpd[i] ^= fpd[i] >> 17;
+                    fpd[i] ^= fpd[i] << 5;
+                    inputSample += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
+                    //end 32 bit stereo floating point dither
+                }
 
                 // bring gain back up
                 inputSample *= gainBoost;
@@ -248,6 +318,47 @@ struct Vibrato : Module {
 };
 
 struct VibratoWidget : ModuleWidget {
+
+    // quality item
+    struct QualityItem : MenuItem {
+        Vibrato* module;
+        int quality;
+
+        void onAction(const event::Action& e) override
+        {
+            module->quality = quality;
+        }
+
+        void step() override
+        {
+            rightText = (module->quality == quality) ? "✔" : "";
+        }
+    };
+
+    void appendContextMenu(Menu* menu) override
+    {
+        Vibrato* module = dynamic_cast<Vibrato*>(this->module);
+        assert(module);
+
+        menu->addChild(new MenuSeparator()); // separator
+
+        MenuLabel* qualityLabel = new MenuLabel(); // menu label
+        qualityLabel->text = "Quality";
+        menu->addChild(qualityLabel);
+
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Eco";
+        low->module = module;
+        low->quality = 0;
+        menu->addChild(low);
+
+        QualityItem* high = new QualityItem(); // high quality
+        high->text = "High";
+        high->module = module;
+        high->quality = 1;
+        menu->addChild(high);
+    }
+
     VibratoWidget(Vibrato* module)
     {
         setModule(module);
