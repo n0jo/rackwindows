@@ -37,6 +37,7 @@ struct Distance : Module {
         NUM_LIGHTS
     };
 
+    // module variables
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
     int quality;
