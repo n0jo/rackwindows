@@ -39,9 +39,17 @@ struct Tremolo : Module {
         NUM_LIGHTS
     };
 
+    // module variables
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
+    int quality;
+    dsp::ClockDivider partTimeJob;
 
+    // control parameters
+    float speedParam;
+    float depthParam;
+
+    // global variables (as arrays in order to handle up to 16 polyphonic channels)
     double sweep[16];
     double speedChase[16];
     double depthChase[16];
@@ -49,17 +57,26 @@ struct Tremolo : Module {
     double depthAmount[16];
     double lastSpeed[16];
     double lastDepth[16];
-
     long double fpNShape[16];
 
-    float A;
-    float B;
+    // part-time variables (which do not need to be updated every cycle)
+    double overallscale;
+
+    // constants
+    const double tupi = 3.141592653589793238;
 
     Tremolo()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(SPEED_PARAM, 0.f, 1.f, 0.f, "Speed");
         configParam(DEPTH_PARAM, 0.f, 1.f, 0.f, "Depth");
+
+        quality = loadQuality();
+
+        partTimeJob.setDivision(2);
+
+        onSampleRateChange();
+        updateParams();
 
         for (int i = 0; i < 16; i++) {
             sweep[i] = 3.141592653589793238 / 2.0;
@@ -71,41 +88,82 @@ struct Tremolo : Module {
             lastDepth[i] = 1000.0;
             fpNShape[i] = 0.0;
         }
+    }
 
-        A = 0.5;
-        B = 1.0;
+    void onSampleRateChange() override
+    {
+        float sampleRate = APP->engine->getSampleRate();
+
+        overallscale = 1.0;
+        overallscale /= 44100.0;
+        overallscale *= sampleRate;
+    }
+
+    void onReset() override
+    {
+        resetNonJson(false);
+    }
+
+    void resetNonJson(bool recurseNonJson)
+    {
+    }
+
+    void onRandomize() override
+    {
+    }
+
+    json_t* dataToJson() override
+    {
+        json_t* rootJ = json_object();
+
+        // quality
+        json_object_set_new(rootJ, "quality", json_integer(quality));
+
+        return rootJ;
+    }
+
+    void dataFromJson(json_t* rootJ) override
+    {
+        // quality
+        json_t* qualityJ = json_object_get(rootJ, "quality");
+        if (qualityJ)
+            quality = json_integer_value(qualityJ);
+
+        resetNonJson(true);
+    }
+
+    void updateParams()
+    {
+        speedParam = params[SPEED_PARAM].getValue();
+        speedParam += inputs[SPEED_CV_INPUT].getVoltage() / 5;
+        speedParam = clamp(speedParam, 0.01f, 0.99f);
+
+        depthParam = params[DEPTH_PARAM].getValue();
+        depthParam += inputs[DEPTH_CV_INPUT].getVoltage() / 5;
+        depthParam = clamp(depthParam, 0.01f, 0.99f);
     }
 
     void process(const ProcessArgs& args) override
     {
         if (outputs[OUT_OUTPUT].isConnected()) {
 
-            // params
-            A = params[SPEED_PARAM].getValue();
-            A += inputs[SPEED_CV_INPUT].getVoltage() / 5;
-            A = clamp(A, 0.01f, 0.99f);
-
-            B = params[DEPTH_PARAM].getValue();
-            B += inputs[DEPTH_CV_INPUT].getVoltage() / 5;
-            B = clamp(B, 0.01f, 0.99f);
-
-            double overallscale = 1.0;
-            overallscale /= 44100.0;
-            overallscale *= args.sampleRate;
+            // stuff that doesn't need to be processed every cycle
+            if (partTimeJob.process()) {
+                updateParams();
+            }
 
             double speed;
             double depth;
             double skew;
             double density;
-
-            double tupi = 3.141592653589793238;
             double control;
             double tempcontrol;
             double thickness;
             double out;
             double bridgerectifier;
             double offset;
-
+            double speedSpeed;
+            double depthSpeed;
             long double inputSample;
             long double drySample;
 
@@ -115,10 +173,10 @@ struct Tremolo : Module {
             // for each poly channel
             for (int i = 0; i < numChannels; i++) {
 
-                speedChase[i] = pow(A, 4);
-                depthChase[i] = B;
-                double speedSpeed = 300 / (fabs(lastSpeed[i] - speedChase[i]) + 1.0);
-                double depthSpeed = 300 / (fabs(lastDepth[i] - depthChase[i]) + 1.0);
+                speedChase[i] = pow(speedParam, 4);
+                depthChase[i] = depthParam;
+                speedSpeed = 300 / (fabs(lastSpeed[i] - speedChase[i]) + 1.0);
+                depthSpeed = 300 / (fabs(lastDepth[i] - depthChase[i]) + 1.0);
                 lastSpeed[i] = speedChase[i];
                 lastDepth[i] = depthChase[i];
 
@@ -128,29 +186,31 @@ struct Tremolo : Module {
                 // pad gain
                 inputSample *= gainCut;
 
-                if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
-                    static int noisesource = 0;
-                    //this declares a variable before anything else is compiled. It won't keep assigning
-                    //it to 0 for every sample, it's as if the declaration doesn't exist in this context,
-                    //but it lets me add this denormalization fix in a single place rather than updating
-                    //it in three different locations. The variable isn't thread-safe but this is only
-                    //a random seed and we can share it with whatever.
-                    noisesource = noisesource % 1700021;
-                    noisesource++;
-                    int residue = noisesource * noisesource;
-                    residue = residue % 170003;
-                    residue *= residue;
-                    residue = residue % 17011;
-                    residue *= residue;
-                    residue = residue % 1709;
-                    residue *= residue;
-                    residue = residue % 173;
-                    residue *= residue;
-                    residue = residue % 17;
-                    double applyresidue = residue;
-                    applyresidue *= 0.00000001;
-                    applyresidue *= 0.00000001;
-                    inputSample = applyresidue;
+                if (quality == 1) {
+                    if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
+                        static int noisesource = 0;
+                        //this declares a variable before anything else is compiled. It won't keep assigning
+                        //it to 0 for every sample, it's as if the declaration doesn't exist in this context,
+                        //but it lets me add this denormalization fix in a single place rather than updating
+                        //it in three different locations. The variable isn't thread-safe but this is only
+                        //a random seed and we can share it with whatever.
+                        noisesource = noisesource % 1700021;
+                        noisesource++;
+                        int residue = noisesource * noisesource;
+                        residue = residue % 170003;
+                        residue *= residue;
+                        residue = residue % 17011;
+                        residue *= residue;
+                        residue = residue % 1709;
+                        residue *= residue;
+                        residue = residue % 173;
+                        residue *= residue;
+                        residue = residue % 17;
+                        double applyresidue = residue;
+                        applyresidue *= 0.00000001;
+                        applyresidue *= 0.00000001;
+                        inputSample = applyresidue;
+                    }
                 }
 
                 drySample = inputSample;
@@ -204,12 +264,14 @@ struct Tremolo : Module {
                 //apply tremolo, apply gain boost to compensate for volume loss
                 inputSample = (drySample * (1 - depth)) + (inputSample * depth);
 
-                //stereo 32 bit dither, made small and tidy.
-                int expon;
-                frexpf((float)inputSample, &expon);
-                long double dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
-                inputSample += (dither - fpNShape[i]);
-                fpNShape[i] = dither;
+                if (quality == 1) {
+                    //stereo 32 bit dither, made small and tidy.
+                    int expon;
+                    frexpf((float)inputSample, &expon);
+                    long double dither = (rand() / (RAND_MAX * 7.737125245533627e+25)) * pow(2, expon + 62);
+                    inputSample += (dither - fpNShape[i]);
+                    fpNShape[i] = dither;
+                }
 
                 // bring gain back up
                 inputSample *= gainBoost;
@@ -226,6 +288,47 @@ struct Tremolo : Module {
 };
 
 struct TremoloWidget : ModuleWidget {
+
+    // quality item
+    struct QualityItem : MenuItem {
+        Tremolo* module;
+        int quality;
+
+        void onAction(const event::Action& e) override
+        {
+            module->quality = quality;
+        }
+
+        void step() override
+        {
+            rightText = (module->quality == quality) ? "✔" : "";
+        }
+    };
+
+    void appendContextMenu(Menu* menu) override
+    {
+        Tremolo* module = dynamic_cast<Tremolo*>(this->module);
+        assert(module);
+
+        menu->addChild(new MenuSeparator()); // separator
+
+        MenuLabel* qualityLabel = new MenuLabel(); // menu label
+        qualityLabel->text = "Quality";
+        menu->addChild(qualityLabel);
+
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Eco";
+        low->module = module;
+        low->quality = 0;
+        menu->addChild(low);
+
+        QualityItem* high = new QualityItem(); // high quality
+        high->text = "High";
+        high->module = module;
+        high->quality = 1;
+        menu->addChild(high);
+    }
+
     TremoloWidget(Tremolo* module)
     {
         setModule(module);

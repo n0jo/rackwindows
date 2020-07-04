@@ -1478,17 +1478,17 @@ struct MvWidget : ModuleWidget {
         qualityLabel->text = "Quality";
         menu->addChild(qualityLabel);
 
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Eco";
+        low->module = module;
+        low->quality = 0;
+        menu->addChild(low);
+
         QualityItem* high = new QualityItem(); // high quality
         high->text = "High";
         high->module = module;
         high->quality = 1;
         menu->addChild(high);
-
-        QualityItem* low = new QualityItem(); // low quality
-        low->text = "Low";
-        low->module = module;
-        low->quality = 0;
-        menu->addChild(low);
     }
 
     MvWidget(Mv* module)

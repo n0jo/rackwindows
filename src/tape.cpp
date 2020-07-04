@@ -38,11 +38,17 @@ struct Tape : Module {
         NUM_LIGHTS
     };
 
+    // module variables
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
+    int quality;
+    dsp::ClockDivider partTimeJob;
 
-    bool quality;
+    // control parameters
+    float slamParam;
+    float bumpParam;
 
+    // global variables (as arrays in order to handle up to 16 polyphonic channels)
     struct vars32 {
         float iirMidRollerA;
         float iirMidRollerB;
@@ -75,8 +81,15 @@ struct Tape : Module {
         uint32_t fpd;
     } v64L[16], v64R[16];
 
-    float A;
-    float B;
+    // part-time variables (which do not need to be updated every cycle)
+    double overallscale;
+    double inputgain;
+    double bumpgain;
+    double HeadBumpFreq;
+    double rollAmount;
+
+    // constants
+    const double softness = 0.618033988749894848204586;
 
     Tape()
     {
@@ -85,6 +98,11 @@ struct Tape : Module {
         configParam(BUMP_PARAM, 0.f, 1.f, 0.5f, "Bump");
 
         quality = loadQuality();
+
+        partTimeJob.setDivision(2);
+
+        onSampleRateChange();
+        updateParams();
 
         for (int i = 0; i < 16; i++) {
             v32L[i].iirMidRollerA = v32L[i].iirMidRollerB = v32L[i].iirHeadBumpA = v32L[i].iirHeadBumpB = 0.0;
@@ -108,9 +126,15 @@ struct Tape : Module {
             v32L[i].fpd = v32R[i].fpd = 17;
             v64L[i].fpd = v64R[i].fpd = 17;
         }
+    }
 
-        A = 0.5;
-        B = 0.5;
+    void onSampleRateChange() override
+    {
+        float sampleRate = APP->engine->getSampleRate();
+
+        overallscale = 1.0;
+        overallscale /= 44100.0;
+        overallscale *= sampleRate;
     }
 
     void onReset() override
@@ -146,34 +170,36 @@ struct Tape : Module {
         resetNonJson(true);
     }
 
-    void processChannel32(vars32 v[], float sampleRate, Param& slam, Param& bump, Input& slamCv, Input& bumpCv, Input& input, Output& output)
+    void updateParams()
+    {
+        slamParam = params[SLAM_PARAM].getValue();
+        slamParam += inputs[SLAM_CV_INPUT].getVoltage() / 10;
+        slamParam = clamp(slamParam, 0.01f, 0.99f);
+
+        bumpParam = params[BUMP_PARAM].getValue();
+        bumpParam += inputs[BUMP_CV_INPUT].getVoltage() / 10;
+        bumpParam = clamp(bumpParam, 0.01f, 0.99f);
+
+        inputgain = pow(10.0, ((slamParam - 0.5) * 24.0) / 20.0);
+        bumpgain = bumpParam * 0.1;
+        HeadBumpFreq = 0.12 / overallscale;
+        rollAmount = (1.0 - softness) / overallscale;
+    }
+
+    void processChannel32(vars32 v[], Input& input, Output& output)
     {
         if (output.isConnected()) {
+
+            // stuff that doesn't need to be processed every cycle
+            if (partTimeJob.process()) {
+                updateParams();
+            }
 
             float in[16] = {};
             float out[16] = {};
             int numChannels = 1;
 
-            // params
-            A = slam.getValue();
-            A += slamCv.getVoltage() / 10;
-            A = clamp(A, 0.01f, 0.99f);
-
-            B = bump.getValue();
-            B += bumpCv.getVoltage() / 10;
-            B = clamp(B, 0.01f, 0.99f);
-
-            double overallscale = 1.0;
-            overallscale /= 44100.0;
-            overallscale *= sampleRate;
-
-            float inputgain = pow(10.0, ((A - 0.5) * 24.0) / 20.0);
-            float bumpgain = B * 0.1;
-            float HeadBumpFreq = 0.12 / overallscale;
-            float softness = 0.618033988749894848204586;
-            float rollAmount = (1.0 - softness) / overallscale;
             float suppress;
-
             float drySample;
             float highsSample;
             float nonHighsSample;
@@ -181,6 +207,8 @@ struct Tape : Module {
             float groundSample;
             float applySoften;
             float inputSample;
+            float K;
+            float norm;
 
             if (input.isConnected()) {
                 // get input
@@ -194,8 +222,8 @@ struct Tape : Module {
                 //[1] is resonance, 0.7071 is Butterworth. Also can't be zero
                 v[i].biquadA[0] = v[i].biquadB[0] = 0.0072 / overallscale;
                 v[i].biquadA[1] = v[i].biquadB[1] = 0.0009;
-                double K = tan(M_PI * v[i].biquadB[0]);
-                double norm = 1.0 / (1.0 + K / v[i].biquadB[1] + K * K);
+                K = tan(M_PI * v[i].biquadB[0]);
+                norm = 1.0 / (1.0 + K / v[i].biquadB[1] + K * K);
                 v[i].biquadA[2] = v[i].biquadB[2] = K / v[i].biquadB[1] * norm;
                 v[i].biquadA[4] = v[i].biquadB[4] = -v[i].biquadB[2];
                 v[i].biquadA[5] = v[i].biquadB[5] = 2.0 * (K * K - 1.0) * norm;
@@ -365,34 +393,20 @@ struct Tape : Module {
         }
     }
 
-    void processChannel64(vars64 v[], float sampleRate, Param& slam, Param& bump, Input& slamCv, Input& bumpCv, Input& input, Output& output)
+    void processChannel64(vars64 v[], Input& input, Output& output)
     {
         if (output.isConnected()) {
+
+            // stuff that doesn't need to be processed every cycle
+            if (partTimeJob.process()) {
+                updateParams();
+            }
 
             float in[16] = {};
             float out[16] = {};
             int numChannels = 1;
 
-            // params
-            A = slam.getValue();
-            A += slamCv.getVoltage() / 10;
-            A = clamp(A, 0.01f, 0.99f);
-
-            B = bump.getValue();
-            B += bumpCv.getVoltage() / 10;
-            B = clamp(B, 0.01f, 0.99f);
-
-            double overallscale = 1.0;
-            overallscale /= 44100.0;
-            overallscale *= sampleRate;
-
-            double inputgain = pow(10.0, ((A - 0.5) * 24.0) / 20.0);
-            double bumpgain = B * 0.1;
-            double HeadBumpFreq = 0.12 / overallscale;
-            double softness = 0.618033988749894848204586;
-            double rollAmount = (1.0 - softness) / overallscale;
             double suppress;
-
             long double drySample;
             long double highsSample;
             long double nonHighsSample;
@@ -400,6 +414,8 @@ struct Tape : Module {
             long double groundSample;
             long double applySoften;
             long double inputSample;
+            double K;
+            double norm;
 
             if (input.isConnected()) {
                 // get input
@@ -413,8 +429,8 @@ struct Tape : Module {
                 //[1] is resonance, 0.7071 is Butterworth. Also can't be zero
                 v[i].biquadA[0] = v[i].biquadB[0] = 0.0072 / overallscale;
                 v[i].biquadA[1] = v[i].biquadB[1] = 0.0009;
-                double K = tan(M_PI * v[i].biquadB[0]);
-                double norm = 1.0 / (1.0 + K / v[i].biquadB[1] + K * K);
+                K = tan(M_PI * v[i].biquadB[0]);
+                norm = 1.0 / (1.0 + K / v[i].biquadB[1] + K * K);
                 v[i].biquadA[2] = v[i].biquadB[2] = K / v[i].biquadB[1] * norm;
                 v[i].biquadA[4] = v[i].biquadB[4] = -v[i].biquadB[2];
                 v[i].biquadA[5] = v[i].biquadB[5] = 2.0 * (K * K - 1.0) * norm;
@@ -600,12 +616,12 @@ struct Tape : Module {
     {
         switch (quality) {
         case 1:
-            processChannel32(v32L, args.sampleRate, params[SLAM_PARAM], params[BUMP_PARAM], inputs[SLAM_CV_INPUT], inputs[BUMP_CV_INPUT], inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT]);
-            processChannel32(v32R, args.sampleRate, params[SLAM_PARAM], params[BUMP_PARAM], inputs[SLAM_CV_INPUT], inputs[BUMP_CV_INPUT], inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT]);
+            processChannel64(v64L, inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT]);
+            processChannel64(v64R, inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT]);
             break;
         default:
-            processChannel64(v64L, args.sampleRate, params[SLAM_PARAM], params[BUMP_PARAM], inputs[SLAM_CV_INPUT], inputs[BUMP_CV_INPUT], inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT]);
-            processChannel64(v64R, args.sampleRate, params[SLAM_PARAM], params[BUMP_PARAM], inputs[SLAM_CV_INPUT], inputs[BUMP_CV_INPUT], inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT]);
+            processChannel32(v32L, inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT]);
+            processChannel32(v32R, inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT]);
         }
     }
 };
@@ -639,17 +655,17 @@ struct TapeWidget : ModuleWidget {
         qualityLabel->text = "Quality";
         menu->addChild(qualityLabel);
 
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Eco";
+        low->module = module;
+        low->quality = 0;
+        menu->addChild(low);
+
         QualityItem* high = new QualityItem(); // high quality
         high->text = "High";
         high->module = module;
-        high->quality = 0;
+        high->quality = 1;
         menu->addChild(high);
-
-        QualityItem* low = new QualityItem(); // low quality
-        low->text = "Low";
-        low->module = module;
-        low->quality = 1;
-        menu->addChild(low);
     }
 
     TapeWidget(Tape* module)
