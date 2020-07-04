@@ -54,13 +54,6 @@ struct Vibrato : Module {
     int quality;
     dsp::ClockDivider partTimeJob;
     dsp::PulseGenerator eocPulse, eocFmPulse;
-    // const float triggerLength = 0.0001f;
-    // const float triggerThreshold = 0.0005f;
-    // bool triggerEoc = false;
-    // bool triggerEocFm = false;
-    // float speedLight = 0.0f;
-    // float speedFmLight = 0.0f;
-    // const float lightLambda = 0.075f;
 
     // control parameters
     float speedParam;
