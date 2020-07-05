@@ -19,6 +19,10 @@ See ./LICENSE.md for all licenses
 
 #include "plugin.hpp"
 
+// quality options
+#define ECO 0
+#define HIGH 1
+
 struct Console : Module {
     enum ParamIds {
         NUM_PARAMS
@@ -54,8 +58,7 @@ struct Console : Module {
     // No need to save, with reset
 
     // No need to save, no reset
-    uint32_t fpd;
-    float A;
+    uint32_t fpd[16];
 
     dsp::VuMeter2 vuMeters[9];
     dsp::ClockDivider lightDivider;
@@ -71,8 +74,9 @@ struct Console : Module {
 
         // panelTheme = (loadDarkAsDefault() ? 1 : 0);
 
-        A = 1.0;
-        fpd = 17;
+        for (int i = 0; i < 16; i++) {
+            fpd[i] = 17;
+        }
 
         lightDivider.setDivision(512);
     }
@@ -187,9 +191,9 @@ struct Console : Module {
                 // pad gain, will be boosted in consoleBuss()
                 inputSample *= gainCut;
 
-                if (quality == 0) {
+                if (quality == HIGH) {
                     if (fabs(inputSample) < 1.18e-37)
-                        inputSample = fpd * 1.18e-37;
+                        inputSample = fpd[i] * 1.18e-37;
                 }
 
                 // encode
@@ -202,8 +206,7 @@ struct Console : Module {
         }
     }
 
-    void
-    consoleBuss(Output& output, long double mix[], int maxChannels)
+    void consoleBuss(Output& output, long double mix[], int maxChannels)
     {
         if (output.isConnected()) {
             float out[16] = {};
@@ -211,27 +214,22 @@ struct Console : Module {
             for (int i = 0; i < maxChannels; i++) {
                 long double inputSample = mix[i];
 
-                if (quality == 0) {
-                    if (fabs(inputSample) < 1.18e-37)
-                        inputSample = fpd * 1.18e-37;
-                }
-
                 // decode
                 inputSample = decode(inputSample, consoleType);
 
-                // bring gain back up
-                inputSample *= gainBoost;
-
-                if (quality == 0) {
+                if (quality == HIGH) {
                     //begin 32 bit stereo floating point dither
                     int expon;
                     frexpf((float)inputSample, &expon);
-                    fpd ^= fpd << 13;
-                    fpd ^= fpd >> 17;
-                    fpd ^= fpd << 5;
-                    inputSample += ((double(fpd) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
+                    fpd[i] ^= fpd[i] << 13;
+                    fpd[i] ^= fpd[i] >> 17;
+                    fpd[i] ^= fpd[i] << 5;
+                    inputSample += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
                     //end 32 bit stereo floating point dither
                 }
+
+                // bring gain back up
+                inputSample *= gainBoost;
 
                 out[i] = (float)inputSample;
             }
@@ -255,17 +253,13 @@ struct Console : Module {
 
             // for each mixer channel
             for (int i = 0; i < 9; i++) {
-                // if (inputs[IN_L_INPUTS + i].isConnected()) {
                 numChannelsL = inputs[IN_L_INPUTS + i].getChannels();
                 maxChannelsL = std::max(maxChannelsL, numChannelsL);
                 sumL = consoleChannel(inputs[IN_L_INPUTS + i], mixL, numChannelsL); // encode L
-                // }
 
-                // if (inputs[IN_R_INPUTS + i].isConnected()) {
                 numChannelsR = inputs[IN_R_INPUTS + i].getChannels();
                 maxChannelsR = std::max(maxChannelsR, numChannelsR);
                 sumR = consoleChannel(inputs[IN_R_INPUTS + i], mixR, numChannelsR); // encode R
-                // }
 
                 // channel VU light
                 vuMeters[i].process(args.sampleTime, (sumL + sumR) / 5.f);
@@ -275,13 +269,8 @@ struct Console : Module {
                 }
             }
 
-            // if (outputs[OUT_L_OUTPUT].isConnected()) {
             consoleBuss(outputs[OUT_L_OUTPUT], mixL, maxChannelsL); // decode L
-            // }
-
-            // if (outputs[OUT_R_OUTPUT].isConnected()) {
             consoleBuss(outputs[OUT_R_OUTPUT], mixR, maxChannelsR); // decode R
-            // }
         }
     }
 };
@@ -306,6 +295,7 @@ struct ConsoleWidget : ModuleWidget {
         }
     };
 
+    // console type item
     struct ConsoleTypeItem : MenuItem {
         Console* module;
         int consoleType;
@@ -347,17 +337,17 @@ struct ConsoleWidget : ModuleWidget {
         qualityLabel->text = "Quality";
         menu->addChild(qualityLabel);
 
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Eco";
+        low->module = module;
+        low->quality = 0;
+        menu->addChild(low);
+
         QualityItem* high = new QualityItem(); // high quality
         high->text = "High";
         high->module = module;
-        high->quality = 0;
+        high->quality = 1;
         menu->addChild(high);
-
-        QualityItem* low = new QualityItem(); // low quality
-        low->text = "Low";
-        low->module = module;
-        low->quality = 1;
-        menu->addChild(low);
 
         menu->addChild(new MenuSeparator()); // separator
 
