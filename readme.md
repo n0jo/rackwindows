@@ -95,7 +95,7 @@ Subtle analogifier
 
 ![Rackwindows Hombre](res/images/interstage_panels.jpg)
 
-Well, I won't attempt to describe or even explain what this one does. Please head straight over to the Airwindows site for details. But I will say this: If I had to choose just one Airwindows tool, this would be it (or maybe Console?). It's simple, it's subtle and to my ears pure class. Put it anywhere in your patch, you can't do no wrong. It will most likely be for the better :-)
+Well, I won't attempt to describe or even explain what this one does. Please head straight over to the Airwindows site for details. But I will say this: If I had to choose just one Airwindows tool, this would be it (or maybe Console?). It's simple, it's subtle and to my ears pure class. Put it anywhere in your patch, you can do no wrong. It will most likely be for the better :-)
 
 [More information](https://www.airwindows.com/interstage/)
 
