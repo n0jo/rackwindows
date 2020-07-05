@@ -206,7 +206,7 @@ struct Mv : Module {
     Mv()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(DEPTH_PARAM, 0.12f, 1.f, 0.5f, "Depth");
+        configParam(DEPTH_PARAM, 0.12f, 1.f, 0.56f, "Depth");
         configParam(REGEN_PARAM, 0.f, 1.f, 0.5f, "Regeneration");
         configParam(BRIGHT_PARAM, 0.f, 1.f, 0.5f, "Brightness");
         configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
