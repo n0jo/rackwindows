@@ -1,6 +1,11 @@
 
+### 1.0.5 (05-07-2020)
+- New module: ResEQ
+- Added/Updated low CPU mode for Chorus, Console, Distance, Hombre, MV, Tape, Tremolo and Vibrato
+- All: minor performance optimizations
+
 ### 1.0.4 (22-05-2020)
-- Now polyphonic: Dual BSG, Capacitor, Capacitor ST, Chorus, Console, Distance, Hombre, Tape, Tremolo, Vibrato
+- Now polyphonic: Dual BSG, Capacitor, Capacitor ST, Chorus, Console, Distance, Hombre, Tape, Tremolo and Vibrato
 - Capacitor, Capacitor ST: added low cpu mode
 
 ### 1.0.3 (24-04-2020)

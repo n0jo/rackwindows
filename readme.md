@@ -23,6 +23,7 @@ See [LICENSE.md](LICENSE.md) for all licenses
 - [Dual BSG](#dual-bsg): Dual gain shifter
 - [Hombre](#hombre): Texas tone and texture
 - [MV](#mv): Dual-mono reverb
+- [ResEQ](#reseq): Resonance equalizer
 - [Tape](#tape): All-purpose tape mojo
 - [Tremolo](#tremolo): Organic pulsating thing
 - [Vibrato](#vibrato): FM Vibrator o_O
@@ -96,6 +97,16 @@ Dual-mono reverb
 A reverb based on Bitshiftgain and old Alesis Midiverbs. Capable of turning everything into a pad or sustaining a 'bloom' forever. Watch your volume when using small amounts of depth with full on regeneration.
 
 [More information](http://www.airwindows.com/mv)
+
+## ResEQ <a id="reseq"></a>
+
+Resonance equalizer
+
+![Rackwindows ResEQ](res/images/reseq_panels.jpg)
+
+ResEQ passes audio through up to four adjustable frequency bands - and only those bands. All bands are similar and with identical range, but interact with each other in a particular way. They can be stacked for massive boosts or thin the signal out if set slightly apart. What sounds artificial in isolation, can be useful to highlight certain characteristics of a sound and then blend to taste with the dry/wet for more natural results.
+
+[More information](https://www.airwindows.com/reseq-vst/)
 
 ## Tape <a id="tape"></a>
 
