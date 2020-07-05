@@ -1,5 +1,5 @@
 
-### 1.0.5 (05-07-2020)
+### 1.1.0 (05-07-2020)
 - New module: ResEQ
 - Added/Updated low CPU mode for Chorus, Console, Distance, Hombre, MV, Tape, Tremolo and Vibrato
 - All: minor performance optimizations
