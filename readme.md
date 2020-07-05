@@ -22,6 +22,7 @@ See [LICENSE.md](LICENSE.md) for all licenses
 - [Distance](#distance): Designed to mimic through-air high frequency attenuation
 - [Dual BSG](#dual-bsg): Dual gain shifter
 - [Hombre](#hombre): Texas tone and texture
+- [Interstage](#interstage): Subtle analogifier
 - [MV](#mv): Dual-mono reverb
 - [ResEQ](#reseq): Resonance equalizer
 - [Tape](#tape): All-purpose tape mojo
@@ -87,6 +88,16 @@ Texas tone and texture
 ![Rackwindows Hombre](res/images/hombre_panels.jpg)
 
 [More information](http://www.airwindows.com/hombre-vst)
+
+## Interstage <a id="interstage"></a>
+
+Subtle analogifier
+
+![Rackwindows Hombre](res/images/interstage_panels.jpg)
+
+Well, I won't attempt to describe or even explain what this one does. Please head straight over to the Airwindows site for details. But I will say this: If I had to choose just one Airwindows tool, this would be it (or maybe Console?). It's simple, it's subtle and to my ears pure class. Put it anywhere in your patch, you can't do no wrong. It will most likely be for the better :-)
+
+[More information](https://www.airwindows.com/interstage/)
 
 ## MV <a id="mv"></a>
 
