@@ -218,7 +218,7 @@ struct Mv : Module {
         quality = 0;
         quality = loadQuality();
 
-        partTimeJob.setDivision(64);
+        partTimeJob.setDivision(2);
 
         updateParams();
 
