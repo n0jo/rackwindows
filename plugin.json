@@ -80,8 +80,18 @@
       "description": "Texas tone and texture",
       "tags": [
         "Distortion",
-        "Polyphonic",
-        "Effect"
+        "Effect",
+        "Polyphonic"
+      ]
+    },
+    {
+      "slug": "interstage",
+      "name": "Interstage",
+      "description": "Subtle analogifier",
+      "tags": [
+        "Effect",
+        "Filter",
+        "Polyphonic"
       ]
     },
     {
