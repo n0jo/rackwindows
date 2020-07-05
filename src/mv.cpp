@@ -215,7 +215,6 @@ struct Mv : Module {
         configParam(DRYWET_CV_PARAM, -1.f, 1.f, 0.f, "Dry/Wet CV");
         configParam(REGEN_CV_PARAM, -1.f, 1.f, 0.f, "Regeneration CV");
 
-        quality = 0;
         quality = loadQuality();
 
         partTimeJob.setDivision(2);
