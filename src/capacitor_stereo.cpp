@@ -47,12 +47,19 @@ struct Capacitor_stereo : Module {
         NUM_LIGHTS
     };
 
+    // module variables
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
-
     bool isLinked;
     bool quality;
+    dsp::ClockDivider partTimeJob;
 
+    // control parameters
+    float lowpassParam;
+    float highpassParam;
+    float drywetParam;
+
+    // global variables (as arrays in order to handle up to 16 polyphonic channels)
     struct vars32 {
         float iirHighpassA;
         float iirHighpassB;
@@ -109,16 +116,14 @@ struct Capacitor_stereo : Module {
 
     int countL[16];
     int countR[16];
+    long double fpNShapeL[16];
+    long double fpNShapeR[16];
 
     float lastLowpass;
     float lastHighpass;
 
-    long double fpNShapeL[16];
-    long double fpNShapeR[16];
-
-    float A;
-    float B;
-    float C;
+    // part-time variables (which do not need to be updated every cycle)
+    double overallscale;
 
     Capacitor_stereo()
     {
@@ -132,6 +137,11 @@ struct Capacitor_stereo : Module {
 
         isLinked = true;
         quality = loadQuality();
+
+        partTimeJob.setDivision(2);
+
+        onSampleRateChange();
+        updateParams();
 
         for (int i = 0; i < 16; i++) {
             v32L[i].iirHighpassA = v64L[i].iirHighpassA = v32R[i].iirHighpassA = v64R[i].iirHighpassA = 0.0;
@@ -162,6 +172,15 @@ struct Capacitor_stereo : Module {
 
             fpNShapeL[i] = fpNShapeR[i] = 0.0;
         }
+    }
+
+    void onSampleRateChange() override
+    {
+        float sampleRate = APP->engine->getSampleRate();
+
+        overallscale = 1.0;
+        overallscale /= 44100.0;
+        overallscale *= sampleRate;
     }
 
     void onReset() override
@@ -197,22 +216,26 @@ struct Capacitor_stereo : Module {
         resetNonJson(true);
     }
 
+    void updateParams()
+    {
+    }
+
     void processChannel32(vars32 v[], int count[], Param& lowpass, Param& highpass, Param& drywet, Input& lowpassCv, Input& highpassCv, Input& drywetCv, Input& input, Output& output)
     {
         if (output.isConnected()) {
 
             // params
-            A = lowpass.getValue();
-            A += lowpassCv.getVoltage() / 5;
-            A = clamp(A, 0.01f, 0.99f);
+            lowpassParam = lowpass.getValue();
+            lowpassParam += lowpassCv.getVoltage() / 5;
+            lowpassParam = clamp(lowpassParam, 0.01f, 0.99f);
 
-            B = highpass.getValue();
-            B += highpassCv.getVoltage() / 5;
-            B = clamp(B, 0.01f, 0.99f);
+            highpassParam = highpass.getValue();
+            highpassParam += highpassCv.getVoltage() / 5;
+            highpassParam = clamp(highpassParam, 0.01f, 0.99f);
 
-            C = drywet.getValue();
-            C += drywetCv.getVoltage() / 5;
-            C = clamp(C, 0.01f, 0.99f);
+            drywetParam = drywet.getValue();
+            drywetParam += drywetCv.getVoltage() / 5;
+            drywetParam = clamp(drywetParam, 0.01f, 0.99f);
 
             float lowpassSpeed;
             float highpassSpeed;
@@ -227,9 +250,9 @@ struct Capacitor_stereo : Module {
             // for each poly channel
             for (int i = 0, numChannels = std::max(1, input.getChannels()); i < numChannels; ++i) {
 
-                v[i].lowpassChase = pow(A, 2);
-                v[i].highpassChase = pow(B, 2);
-                v[i].wetChase = C;
+                v[i].lowpassChase = pow(lowpassParam, 2);
+                v[i].highpassChase = pow(highpassParam, 2);
+                v[i].wetChase = drywetParam;
                 //should not scale with sample rate, because values reaching 1 are important
                 //to its ability to bypass when set to max
                 lowpassSpeed = 300 / (fabs(v[i].lastLowpass - v[i].lowpassChase) + 1.0);
@@ -363,17 +386,17 @@ struct Capacitor_stereo : Module {
         if (output.isConnected()) {
 
             // params
-            A = lowpass.getValue();
-            A += lowpassCv.getVoltage() / 5;
-            A = clamp(A, 0.01f, 0.99f);
+            lowpassParam = lowpass.getValue();
+            lowpassParam += lowpassCv.getVoltage() / 5;
+            lowpassParam = clamp(lowpassParam, 0.01f, 0.99f);
 
-            B = highpass.getValue();
-            B += highpassCv.getVoltage() / 5;
-            B = clamp(B, 0.01f, 0.99f);
+            highpassParam = highpass.getValue();
+            highpassParam += highpassCv.getVoltage() / 5;
+            highpassParam = clamp(highpassParam, 0.01f, 0.99f);
 
-            C = drywet.getValue();
-            C += drywetCv.getVoltage() / 5;
-            C = clamp(C, 0.01f, 0.99f);
+            drywetParam = drywet.getValue();
+            drywetParam += drywetCv.getVoltage() / 5;
+            drywetParam = clamp(drywetParam, 0.01f, 0.99f);
 
             double lowpassSpeed;
             double highpassSpeed;
@@ -388,9 +411,9 @@ struct Capacitor_stereo : Module {
             // for each poly channel
             for (int i = 0, numChannels = std::max(1, input.getChannels()); i < numChannels; ++i) {
 
-                v[i].lowpassChase = pow(A, 2);
-                v[i].highpassChase = pow(B, 2);
-                v[i].wetChase = C;
+                v[i].lowpassChase = pow(lowpassParam, 2);
+                v[i].highpassChase = pow(highpassParam, 2);
+                v[i].wetChase = drywetParam;
                 //should not scale with sample rate, because values reaching 1 are important
                 //to its ability to bypass when set to max
                 lowpassSpeed = 300 / (fabs(v[i].lastLowpass - v[i].lowpassChase) + 1.0);
@@ -576,12 +599,12 @@ struct Capacitor_stereo : Module {
 
         switch (quality) {
         case 1:
-            processChannel32(v32L, countL, params[LOWPASS_L_PARAM], params[HIGHPASS_L_PARAM], params[DRYWET_PARAM], inputs[LOWPASS_CV_L_INPUT], inputs[HIGHPASS_CV_L_INPUT], inputs[DRYWET_CV_INPUT], inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT]);
-            processChannel32(v32R, countR, params[LOWPASS_R_PARAM], params[HIGHPASS_R_PARAM], params[DRYWET_PARAM], inputs[LOWPASS_CV_R_INPUT], inputs[HIGHPASS_CV_R_INPUT], inputs[DRYWET_CV_INPUT], inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT]);
-            break;
-        default:
             processChannel64(v64L, countL, fpNShapeL, params[LOWPASS_L_PARAM], params[HIGHPASS_L_PARAM], params[DRYWET_PARAM], inputs[LOWPASS_CV_L_INPUT], inputs[HIGHPASS_CV_L_INPUT], inputs[DRYWET_CV_INPUT], inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT]);
             processChannel64(v64R, countR, fpNShapeR, params[LOWPASS_R_PARAM], params[HIGHPASS_R_PARAM], params[DRYWET_PARAM], inputs[LOWPASS_CV_R_INPUT], inputs[HIGHPASS_CV_R_INPUT], inputs[DRYWET_CV_INPUT], inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT]);
+            break;
+        default:
+            processChannel32(v32L, countL, params[LOWPASS_L_PARAM], params[HIGHPASS_L_PARAM], params[DRYWET_PARAM], inputs[LOWPASS_CV_L_INPUT], inputs[HIGHPASS_CV_L_INPUT], inputs[DRYWET_CV_INPUT], inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT]);
+            processChannel32(v32R, countR, params[LOWPASS_R_PARAM], params[HIGHPASS_R_PARAM], params[DRYWET_PARAM], inputs[LOWPASS_CV_R_INPUT], inputs[HIGHPASS_CV_R_INPUT], inputs[DRYWET_CV_INPUT], inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT]);
         }
 
         // link light
@@ -618,17 +641,17 @@ struct Capacitor_stereoWidget : ModuleWidget {
         qualityLabel->text = "Quality";
         menu->addChild(qualityLabel);
 
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Eco";
+        low->module = module;
+        low->quality = 0;
+        menu->addChild(low);
+
         QualityItem* high = new QualityItem(); // high quality
         high->text = "High";
         high->module = module;
-        high->quality = 0;
+        high->quality = 1;
         menu->addChild(high);
-
-        QualityItem* low = new QualityItem(); // low quality
-        low->text = "Low";
-        low->module = module;
-        low->quality = 1;
-        menu->addChild(low);
     }
 
     Capacitor_stereoWidget(Capacitor_stereo* module)
