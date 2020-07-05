@@ -16,6 +16,7 @@ extern Model* modelChorus;
 extern Model* modelConsole;
 extern Model* modelDistance;
 extern Model* modelHombre;
+extern Model* modelInterstage;
 extern Model* modelMv;
 extern Model* modelReseq;
 extern Model* modelTape;
