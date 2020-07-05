@@ -8,10 +8,10 @@
   "authorEmail": "jensrobertjanke@gmail.com",
   "authorUrl": "https://github.com/n0jo",
   "pluginUrl": "https://github.com/n0jo/rackwindows",
-  "manualUrl": "https://github.com/n0jo/rackwindows/blob/master/README.md",
+  "manualUrl": "https://github.com/n0jo/rackwindows/blob/master/readme.md",
   "sourceUrl": "https://github.com/n0jo/rackwindows.git",
   "donateUrl": "",
-  "changelogUrl": "https://github.com/n0jo/rackwindows/blob/master/CHANGELOG.md",
+  "changelogUrl": "https://github.com/n0jo/rackwindows/blob/master/changelog.md",
   "modules": [{
       "slug": "bitshiftgain",
       "name": "Dual BSG",
