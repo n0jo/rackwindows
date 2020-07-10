@@ -2,6 +2,8 @@
 
 ![Rackwindows Modules](res/images/rackwindows_panels.jpg)
 
+**NOTE** As of now some modules don't behave correctly at sample rates other than 44100 Hz. They simply don't scale as they should. Looking for a fix.
+
 Most of these modules are straight-up ports of [Airwindows](http://www.airwindows.com) plugins with the addition of a panel (designed to be potentially buildable in hardware) and the occasional tweak or enhancement to take advantage of the modular environment.
 
 Airwindows plugins are known for exceptional sound quality, innovative approaches and minimalist interfaces. They often focus on and excel at one specific task, which is why I think they are a natural fit for Rack.
