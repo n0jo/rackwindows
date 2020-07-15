@@ -9,12 +9,14 @@ Changes/Additions:
 - CV inputs for depth, regeneration, brightness and dry/wet
 - trimpots for cv inputs
 
-Some UI elements based on graphics from the Component Library by Wes Milholen. 
-
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
 #include "plugin.hpp"
+
+// quality options
+#define ECO 0
+#define HIGH 1
 
 struct Mv : Module {
     enum ParamIds {
@@ -50,15 +52,14 @@ struct Mv : Module {
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
     int quality;
-    dsp::ClockDivider partTimeJob;
 
     // control parameters
-    float depth;
-    float regeneration;
-    float brightness;
-    float drywet;
+    float depthParam;
+    float regenerationParam;
+    float brightnessParam;
+    float drywetParam;
 
-    // global variables
+    // state variables
     double aAL[15150];
     double aBL[14618];
     double aCL[14358];
@@ -201,8 +202,6 @@ struct Mv : Module {
 
     uint32_t fpd;
 
-    // part-time variables (which do not need to be updated every cycle)
-
     Mv()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -216,11 +215,11 @@ struct Mv : Module {
         configParam(REGEN_CV_PARAM, -1.f, 1.f, 0.f, "Regeneration CV");
 
         quality = loadQuality();
+        onReset();
+    }
 
-        partTimeJob.setDivision(2);
-
-        updateParams();
-
+    void onReset() override
+    {
         int count;
         for (count = 0; count < 15149; count++) {
             aAL[count] = 0.0;
@@ -442,19 +441,6 @@ struct Mv : Module {
     {
     }
 
-    void onReset() override
-    {
-        resetNonJson(false);
-    }
-
-    void resetNonJson(bool recurseNonJson)
-    {
-    }
-
-    void onRandomize() override
-    {
-    }
-
     json_t* dataToJson() override
     {
         json_t* rootJ = json_object();
@@ -471,45 +457,34 @@ struct Mv : Module {
         json_t* qualityJ = json_object_get(rootJ, "quality");
         if (qualityJ)
             quality = json_integer_value(qualityJ);
-
-        resetNonJson(true);
-    }
-
-    void updateParams()
-    {
-        depth = inputs[DEPTH_CV_INPUT].getVoltage() * params[DEPTH_CV_PARAM].getValue() / 5;
-        depth += params[DEPTH_PARAM].getValue();
-        depth = clamp(depth, 0.01f, 0.99f);
-
-        brightness = inputs[BRIGHT_CV_INPUT].getVoltage() * params[BRIGHT_CV_PARAM].getValue() / 5;
-        brightness += params[BRIGHT_PARAM].getValue();
-        brightness = clamp(brightness, 0.01f, 0.99f);
-
-        regeneration = inputs[REGEN_CV_INPUT].getVoltage() * params[REGEN_CV_PARAM].getValue() / 5;
-        regeneration += params[REGEN_PARAM].getValue();
-        regeneration = clamp(regeneration, 0.01f, 0.99f);
-
-        drywet = inputs[DRYWET_CV_INPUT].getVoltage() * params[DRYWET_CV_PARAM].getValue() / 5;
-        drywet += params[DRYWET_PARAM].getValue();
-        drywet = clamp(drywet, 0.f, 1.f);
     }
 
     void process(const ProcessArgs& args) override
     {
         if (outputs[OUT_L_OUTPUT].isConnected() || outputs[OUT_R_OUTPUT].isConnected()) {
 
-            if (partTimeJob.process()) {
-                // stuff that doesn't need to be processed every cycle
-                updateParams();
-            }
+            depthParam = inputs[DEPTH_CV_INPUT].getVoltage() * params[DEPTH_CV_PARAM].getValue() / 5;
+            depthParam += params[DEPTH_PARAM].getValue();
+            depthParam = clamp(depthParam, 0.01f, 0.99f);
+
+            brightnessParam = inputs[BRIGHT_CV_INPUT].getVoltage() * params[BRIGHT_CV_PARAM].getValue() / 5;
+            brightnessParam += params[BRIGHT_PARAM].getValue();
+            brightnessParam = clamp(brightnessParam, 0.01f, 0.99f);
+
+            regenerationParam = inputs[REGEN_CV_INPUT].getVoltage() * params[REGEN_CV_PARAM].getValue() / 5;
+            regenerationParam += params[REGEN_PARAM].getValue();
+            regenerationParam = clamp(regenerationParam, 0.01f, 0.99f);
+
+            drywetParam = inputs[DRYWET_CV_INPUT].getVoltage() * params[DRYWET_CV_PARAM].getValue() / 5;
+            drywetParam += params[DRYWET_PARAM].getValue();
+            drywetParam = clamp(drywetParam, 0.f, 1.f);
 
             int allpasstemp;
             double avgtemp;
-            int stage = depth * 27.0;
-            int damp = (1.0 - brightness) * stage;
-            double feedbacklevel = regeneration;
-            double wet = drywet;
+            int stage = depthParam * 27.0;
+            int damp = (1.0 - brightnessParam) * stage;
 
+            double feedbacklevel = regenerationParam;
             //we're forcing even the feedback level to be Midiverb-ized
             if (feedbacklevel <= 0.0625)
                 feedbacklevel = 0.0;
@@ -524,6 +499,8 @@ struct Mv : Module {
             if (feedbacklevel > 0.99)
                 feedbacklevel = 1.0;
 
+            double wet = drywetParam;
+
             // get inputs
             long double inputSampleL = inputs[IN_L_INPUT].getVoltage();
             long double inputSampleR = inputs[IN_R_INPUT].getVoltage();
@@ -532,7 +509,7 @@ struct Mv : Module {
             inputSampleL *= gainCut;
             inputSampleR *= gainCut;
 
-            if (quality == 1) {
+            if (quality == HIGH) {
                 //for live air, we always apply the dither noise. Then, if our result is
                 //effectively digital black, we'll subtract it again. We want a 'air' hiss
                 static int noisesourceL = 0;
@@ -1426,7 +1403,7 @@ struct Mv : Module {
             inputSampleL *= gainBoost;
             inputSampleR *= gainBoost;
 
-            if (quality == 1) {
+            if (quality == HIGH) {
                 //begin 64 bit stereo floating point dither
                 int expon;
                 frexp((double)inputSampleL, &expon);

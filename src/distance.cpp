@@ -10,12 +10,14 @@ Changes/Additions:
 - CV inputs for distance and dry/wet
 - polyphonic
 
-Some UI elements based on graphics from the Component Library by Wes Milholen. 
-
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
 #include "plugin.hpp"
+
+// quality options
+#define ECO 0
+#define HIGH 1
 
 struct Distance : Module {
     enum ParamIds {
@@ -41,13 +43,12 @@ struct Distance : Module {
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
     int quality;
-    dsp::ClockDivider partTimeJob;
 
     // control parameters
     float distanceParam;
     float drywetParam;
 
-    // global variables (as arrays in order to handle up to 16 polyphonic channels)
+    // state variables (as arrays in order to handle up to 16 polyphonic channels)
     double lastclamp[16];
     double clasp[16];
     double change[16];
@@ -56,7 +57,7 @@ struct Distance : Module {
     double last[16];
     long double fpNShape[16];
 
-    // part-time variables (which do not need to be updated every cycle)
+    // other variables, which do not need to be updated every cycle
     double overallscale;
     double softslew;
     double filtercorrect;
@@ -64,6 +65,8 @@ struct Distance : Module {
     double levelcorrect;
     double wet;
     double dry;
+    float lastDistanceParam;
+    float lastDrywetParam;
 
     Distance()
     {
@@ -72,16 +75,26 @@ struct Distance : Module {
         configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
 
         quality = loadQuality();
+        onReset();
+    }
 
-        partTimeJob.setDivision(2);
-
+    void onReset() override
+    {
         onSampleRateChange();
-        updateParams();
 
         for (int i = 0; i < 16; i++) {
             thirdresult[i] = prevresult[i] = lastclamp[i] = clasp[i] = change[i] = last[i] = 0.0;
             fpNShape[i] = 0.0;
         }
+
+        softslew = 0.0;
+        filtercorrect = 0.0;
+        thirdfilter = 0.0;
+        levelcorrect = 0.0;
+        wet = 0.0;
+        dry = 0.0;
+        lastDistanceParam = 0.0;
+        lastDrywetParam = 0.0;
     }
 
     void onSampleRateChange() override
@@ -91,19 +104,6 @@ struct Distance : Module {
         overallscale = 1.0;
         overallscale /= 44100.0;
         overallscale *= sampleRate;
-    }
-
-    void onReset() override
-    {
-        resetNonJson(false);
-    }
-
-    void resetNonJson(bool recurseNonJson)
-    {
-    }
-
-    void onRandomize() override
-    {
     }
 
     json_t* dataToJson() override
@@ -122,42 +122,43 @@ struct Distance : Module {
         json_t* qualityJ = json_object_get(rootJ, "quality");
         if (qualityJ)
             quality = json_integer_value(qualityJ);
-
-        resetNonJson(true);
-    }
-
-    void updateParams()
-    {
-        distanceParam = params[DISTANCE_PARAM].getValue();
-        distanceParam += inputs[DISTANCE_CV_INPUT].getVoltage() / 5;
-        distanceParam = clamp(distanceParam, 0.01f, 0.99f);
-
-        drywetParam = params[DRYWET_PARAM].getValue();
-        drywetParam += inputs[DRYWET_CV_INPUT].getVoltage() / 5;
-        drywetParam = clamp(drywetParam, 0.01f, 0.99f);
-
-        softslew = (pow(distanceParam * 2.0, 3.0) * 12.0) + 0.6;
-        softslew *= overallscale;
-        filtercorrect = softslew / 2.0;
-        thirdfilter = softslew / 3.0;
-        levelcorrect = 1.0 + (softslew / 6.0);
-        wet = drywetParam;
-        dry = 1.0 - wet;
     }
 
     void process(const ProcessArgs& args) override
     {
         if (outputs[OUT_OUTPUT].isConnected()) {
 
-            // stuff that doesn't need to be processed every cycle
-            if (partTimeJob.process()) {
-                updateParams();
+            distanceParam = params[DISTANCE_PARAM].getValue();
+            distanceParam += inputs[DISTANCE_CV_INPUT].getVoltage() / 5;
+            distanceParam = clamp(distanceParam, 0.01f, 0.99f);
+
+            drywetParam = params[DRYWET_PARAM].getValue();
+            drywetParam += inputs[DRYWET_CV_INPUT].getVoltage() / 5;
+            drywetParam = clamp(drywetParam, 0.01f, 0.99f);
+
+            // update only if distanceParam has changed
+            if (distanceParam != lastDistanceParam) {
+                softslew = (pow(distanceParam * 2.0, 3.0) * 12.0) + 0.6;
+                softslew *= overallscale;
+                filtercorrect = softslew / 2.0;
+                thirdfilter = softslew / 3.0;
+                levelcorrect = 1.0 + (softslew / 6.0);
+
+                lastDistanceParam = distanceParam;
+            }
+
+            // update only if distanceParam has changed
+            if (drywetParam != lastDrywetParam) {
+                wet = drywetParam;
+                dry = 1.0 - wet;
+
+                lastDrywetParam = drywetParam;
             }
 
             double postfilter;
             double bridgerectifier;
             long double inputSample;
-            long double drySampleL;
+            long double drySample;
 
             // number of polyphonic channels
             int numChannels = inputs[IN_INPUT].getChannels();
@@ -171,7 +172,7 @@ struct Distance : Module {
                 // pad gain
                 inputSample *= gainCut;
 
-                if (quality == 1) {
+                if (quality == HIGH) {
                     if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
                         static int noisesource = 0;
                         //this declares a variable before anything else is compiled. It won't keep assigning
@@ -198,7 +199,7 @@ struct Distance : Module {
                     }
                 }
 
-                drySampleL = inputSample;
+                drySample = inputSample;
 
                 inputSample *= softslew;
                 lastclamp[i] = clasp[i];
@@ -223,10 +224,10 @@ struct Distance : Module {
                 inputSample *= levelcorrect;
 
                 if (wet < 1.0) {
-                    inputSample = (drySampleL * dry) + (inputSample * wet);
+                    inputSample = (drySample * dry) + (inputSample * wet);
                 }
 
-                if (quality == 1) {
+                if (quality == HIGH) {
                     //stereo 32 bit dither, made small and tidy.
                     int expon;
                     frexpf((float)inputSample, &expon);

@@ -11,12 +11,14 @@ Changes/Additions:
 - CV inputs for frequency beams and drywet
 - polyphonic
 
-Some UI elements based on graphics from the Component Library by Wes Milholen. 
-
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
 #include "plugin.hpp"
+
+// quality options
+#define ECO 0
+#define HIGH 1
 
 struct Reseq : Module {
     enum ParamIds {
@@ -42,26 +44,25 @@ struct Reseq : Module {
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
     int quality;
-    dsp::ClockDivider partTimeJob;
 
     // control parameters
-    float r1;
-    float r2;
-    float r3;
-    float r4;
-    float drywet;
+    float r1Param;
+    float r2Param;
+    float r3Param;
+    float r4Param;
+    float drywetParam;
     bool isActiveR1;
     bool isActiveR2;
     bool isActiveR3;
     bool isActiveR4;
 
-    // global variables (as arrays in order to handle up to 16 polyphonic channels)
+    // state variables (as arrays in order to handle up to 16 polyphonic channels)
     double b[16][61];
     double f[16][61];
     int framenumber[16];
     uint32_t fpd[16];
 
-    // part-time variables (which do not need to be updated every cycle)
+    // other variables, which do not need to be updated every cycle
     double overallscale;
     double v1;
     double v2;
@@ -77,21 +78,21 @@ struct Reseq : Module {
     Reseq()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-
         for (int i = 0; i < 4; i++) {
             configParam(RESO_PARAMS + i, 0.f, 1.f, 0.f, string::f("Reso %d", i + 1), "%", 0, 100);
         }
         configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
 
-        quality = 1;
         quality = loadQuality();
+        onReset();
+    }
 
-        partTimeJob.setDivision(64);
-
+    void onReset() override
+    {
         onSampleRateChange();
+        updateParams();
 
         isActiveR1 = isActiveR2 = isActiveR3 = isActiveR4 = false;
-        updateParams();
 
         for (int i = 0; i < 16; i++) {
             for (int x = 0; x < 61; x++) {
@@ -112,19 +113,6 @@ struct Reseq : Module {
         overallscale *= sampleRate;
     }
 
-    void onReset() override
-    {
-        resetNonJson(false);
-    }
-
-    void resetNonJson(bool recurseNonJson)
-    {
-    }
-
-    void onRandomize() override
-    {
-    }
-
     json_t* dataToJson() override
     {
         json_t* rootJ = json_object();
@@ -141,36 +129,34 @@ struct Reseq : Module {
         json_t* qualityJ = json_object_get(rootJ, "quality");
         if (qualityJ)
             quality = json_integer_value(qualityJ);
-
-        resetNonJson(true);
     }
 
     void updateParams()
     {
-        r1 = params[RESO_PARAMS + 0].getValue();
-        r1 += inputs[RESO_CV_INPUTS + 0].getVoltage() / 5;
-        r1 = clamp(r1, 0.01f, 0.99f);
+        r1Param = params[RESO_PARAMS + 0].getValue();
+        r1Param += inputs[RESO_CV_INPUTS + 0].getVoltage() / 5;
+        r1Param = clamp(r1Param, 0.01f, 0.99f);
 
-        r2 = params[RESO_PARAMS + 1].getValue();
-        r2 += inputs[RESO_CV_INPUTS + 1].getVoltage() / 5;
-        r2 = clamp(r2, 0.01f, 0.99f);
+        r2Param = params[RESO_PARAMS + 1].getValue();
+        r2Param += inputs[RESO_CV_INPUTS + 1].getVoltage() / 5;
+        r2Param = clamp(r2Param, 0.01f, 0.99f);
 
-        r3 = params[RESO_PARAMS + 2].getValue();
-        r3 += inputs[RESO_CV_INPUTS + 2].getVoltage() / 5;
-        r3 = clamp(r3, 0.01f, 0.99f);
+        r3Param = params[RESO_PARAMS + 2].getValue();
+        r3Param += inputs[RESO_CV_INPUTS + 2].getVoltage() / 5;
+        r3Param = clamp(r3Param, 0.01f, 0.99f);
 
-        r4 = params[RESO_PARAMS + 3].getValue();
-        r4 += inputs[RESO_CV_INPUTS + 3].getVoltage() / 5;
-        r4 = clamp(r4, 0.01f, 0.99f);
+        r4Param = params[RESO_PARAMS + 3].getValue();
+        r4Param += inputs[RESO_CV_INPUTS + 3].getVoltage() / 5;
+        r4Param = clamp(r4Param, 0.01f, 0.99f);
 
-        drywet = params[DRYWET_PARAM].getValue();
-        drywet += inputs[DRYWET_CV_INPUT].getVoltage() / 5;
-        drywet = clamp(drywet, 0.01f, 0.99f);
+        drywetParam = params[DRYWET_PARAM].getValue();
+        drywetParam += inputs[DRYWET_CV_INPUT].getVoltage() / 5;
+        drywetParam = clamp(drywetParam, 0.01f, 0.99f);
 
-        wet = drywet;
+        wet = drywetParam;
 
-        if (r1 > 0.01f) {
-            v1 = r1;
+        if (r1Param > 0.01f) {
+            v1 = r1Param;
             f1 = pow(v1, 2);
             v1 += 0.2;
             v1 /= overallscale;
@@ -179,8 +165,8 @@ struct Reseq : Module {
             isActiveR1 = false;
         }
 
-        if (r2 > 0.01f) {
-            v2 = r1;
+        if (r2Param > 0.01f) {
+            v2 = r2Param;
             f2 = pow(v2, 2);
             v2 += 0.2;
             v2 /= overallscale;
@@ -189,9 +175,9 @@ struct Reseq : Module {
             isActiveR2 = false;
         }
 
-        if (r3 > 0.01f) {
-            v3 = r3;
-            f3 = pow(v1, 2);
+        if (r3Param > 0.01f) {
+            v3 = r3Param;
+            f3 = pow(v3, 2);
             v3 += 0.2;
             v3 /= overallscale;
             isActiveR3 = true;
@@ -199,9 +185,9 @@ struct Reseq : Module {
             isActiveR3 = false;
         }
 
-        if (r4 > 0.01f) {
-            v4 = r4;
-            f4 = pow(v1, 2);
+        if (r4Param > 0.01f) {
+            v4 = r4Param;
+            f4 = pow(v4, 2);
             v4 += 0.2;
             v4 /= overallscale;
             isActiveR4 = true;
@@ -258,7 +244,7 @@ struct Reseq : Module {
             }
             //done updating the kernel for this go-round
 
-            if (quality == 1) {
+            if (quality == HIGH) {
                 if (fabs(inputSample) < 1.18e-43)
                     inputSample = fpd[i] * 1.18e-43;
             }
@@ -396,7 +382,7 @@ struct Reseq : Module {
                 inputSample = (inputSample * wet) + (drySample * (1.0 - wet));
             }
 
-            if (quality == 1) {
+            if (quality == HIGH) {
                 //begin 64 bit stereo floating point dither
                 int expon;
                 frexp((double)inputSample, &expon);
@@ -421,11 +407,7 @@ struct Reseq : Module {
     {
         if (outputs[OUT_OUTPUT].isConnected()) {
 
-            if (partTimeJob.process()) {
-                // stuff that doesn't need to be processed every cycle
-                updateParams();
-            }
-
+            updateParams();
             processChannel(inputs[IN_INPUT], outputs[OUT_OUTPUT]);
         }
     }

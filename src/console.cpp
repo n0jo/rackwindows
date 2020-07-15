@@ -11,8 +11,7 @@ Changes/Additions:
 - polyphonic
 - console types: Console6, PurestConsole
 
-Additional code heavily inspired by the Fundamental Mixer by Andrew Belt.
-Some UI elements based on graphics from the Component Library by Wes Milholen.
+Additional code inspired by the Fundamental Mixer by Andrew Belt.
 
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
@@ -44,54 +43,32 @@ struct Console : Module {
         NUM_LIGHTS
     };
 
-    // Constants
+    // module variables
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
-
-    // Need to save, no reset
-    // int panelTheme;
-
-    // Need to save, with reset
     bool quality;
     int consoleType;
-
-    // No need to save, with reset
-
-    // No need to save, no reset
-    uint32_t fpd[16];
-
     dsp::VuMeter2 vuMeters[9];
     dsp::ClockDivider lightDivider;
+
+    // state variables (as arrays in order to handle up to 16 polyphonic channels)
+    uint32_t fpd[16];
 
     Console()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
-        onReset();
-
         quality = loadQuality();
         consoleType = loadConsoleType();
-
-        // panelTheme = (loadDarkAsDefault() ? 1 : 0);
-
-        for (int i = 0; i < 16; i++) {
-            fpd[i] = 17;
-        }
-
         lightDivider.setDivision(512);
+        onReset();
     }
 
     void onReset() override
     {
-        resetNonJson(false);
-    }
-
-    void resetNonJson(bool recurseNonJson)
-    {
-    }
-
-    void onRandomize() override
-    {
+        for (int i = 0; i < 16; i++) {
+            fpd[i] = 17;
+        }
     }
 
     json_t* dataToJson() override
@@ -103,9 +80,6 @@ struct Console : Module {
 
         // consoleType
         json_object_set_new(rootJ, "consoleType", json_integer(consoleType));
-
-        // panelTheme
-        // json_object_set_new(rootJ, "panelTheme", json_integer(panelTheme));
 
         return rootJ;
     }
@@ -121,13 +95,6 @@ struct Console : Module {
         json_t* consoleTypeJ = json_object_get(rootJ, "consoleType");
         if (consoleTypeJ)
             consoleType = json_integer_value(consoleTypeJ);
-
-        // panelTheme
-        // json_t* panelThemeJ = json_object_get(rootJ, "panelTheme");
-        // if (panelThemeJ)
-        //     panelTheme = json_integer_value(panelThemeJ);
-
-        resetNonJson(true);
     }
 
     long double encode(long double inputSample, int consoleType = 0)
@@ -311,21 +278,6 @@ struct ConsoleWidget : ModuleWidget {
         }
     };
 
-    // struct PanelThemeItem : MenuItem {
-    //     Console* module;
-    //     int theme;
-
-    //     void onAction(const event::Action& e) override
-    //     {
-    //         module->panelTheme = theme;
-    //     }
-
-    //     void step() override
-    //     {
-    //         rightText = (module->panelTheme == theme) ? "✔" : "";
-    //     }
-    // };
-
     void appendContextMenu(Menu* menu) override
     {
         Console* module = dynamic_cast<Console*>(this->module);
@@ -366,26 +318,6 @@ struct ConsoleWidget : ModuleWidget {
         purestConsole->module = module;
         purestConsole->consoleType = 1;
         menu->addChild(purestConsole);
-
-        // menu->addChild(new MenuSeparator()); // separator
-
-        // MenuLabel* themeLabel = new MenuLabel(); // menu label
-        // themeLabel->text = "Theme";
-        // menu->addChild(themeLabel);
-
-        // PanelThemeItem* lightItem = new PanelThemeItem(); // light theme
-        // lightItem->text = lightPanelID; // plugin.hpp
-        // lightItem->module = module;
-        // lightItem->theme = 0;
-        // menu->addChild(lightItem);
-
-        // PanelThemeItem* darkItem = new PanelThemeItem(); // dark theme
-        // darkItem->text = darkPanelID; // plugin.hpp
-        // darkItem->module = module;
-        // darkItem->theme = 1;
-        // menu->addChild(darkItem);
-
-        // menu->addChild(createMenuItem<DarkDefaultItem>("Dark as default", CHECKMARK(loadDarkAsDefault()))); // dark theme as default
     }
 
     ConsoleWidget(Console* module)
@@ -394,16 +326,8 @@ struct ConsoleWidget : ModuleWidget {
 
         // panel
         setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/console_dark.svg")));
-        // if (module) {
-        //     darkPanel = new SvgPanel();
-        //     darkPanel->setBackground(APP->window->loadSvg(asset::plugin(pluginInstance, "res/console_light.svg")));
-        //     darkPanel->visible = false;
-        //     addChild(darkPanel);
-        // }
 
         float center = box.size.x / 2.0f;
-        // float col1 = center - box.size.x / 4.0f;
-        // float col3 = center + box.size.x / 4.0f;
 
         // screws
         addChild(createWidget<ScrewBlack>(Vec(RACK_GRID_WIDTH, 0)));
@@ -446,15 +370,6 @@ struct ConsoleWidget : ModuleWidget {
         addOutput(createOutputCentered<RwPJ301MPort>(Vec(26.25, 325.0), module, Console::OUT_L_OUTPUT));
         addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.75, 325.0), module, Console::OUT_R_OUTPUT));
     }
-
-    // void step() override
-    // {
-    //     if (module) {
-    //         panel->visible = ((((Console*)module)->panelTheme) == 0);
-    //         darkPanel->visible = ((((Console*)module)->panelTheme) == 1);
-    //     }
-    //     Widget::step();
-    // }
 };
 
 Model* modelConsole = createModel<Console, ConsoleWidget>("console");

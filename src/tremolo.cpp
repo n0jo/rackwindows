@@ -10,12 +10,14 @@ Changes/Additions:
 - CV inputs for speed and depth
 - polyphonic
 
-Some UI elements based on graphics from the Component Library by Wes Milholen. 
-
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
 #include "plugin.hpp"
+
+// quality options
+#define ECO 0
+#define HIGH 1
 
 struct Tremolo : Module {
     enum ParamIds {
@@ -43,13 +45,12 @@ struct Tremolo : Module {
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
     int quality;
-    dsp::ClockDivider partTimeJob;
 
     // control parameters
     float speedParam;
     float depthParam;
 
-    // global variables (as arrays in order to handle up to 16 polyphonic channels)
+    // state variables (as arrays in order to handle up to 16 polyphonic channels)
     double sweep[16];
     double speedChase[16];
     double depthChase[16];
@@ -59,8 +60,12 @@ struct Tremolo : Module {
     double lastDepth[16];
     long double fpNShape[16];
 
-    // part-time variables (which do not need to be updated every cycle)
+    // other variables, which do not need to be updated every cycle
     double overallscale;
+    double speedSpeed;
+    double depthSpeed;
+    float lastSpeedParam;
+    float lastDepthParam;
 
     // constants
     const double tupi = 3.141592653589793238;
@@ -72,11 +77,17 @@ struct Tremolo : Module {
         configParam(DEPTH_PARAM, 0.f, 1.f, 0.f, "Depth");
 
         quality = loadQuality();
+        onReset();
+    }
 
-        partTimeJob.setDivision(2);
-
+    void onReset() override
+    {
         onSampleRateChange();
-        updateParams();
+
+        speedSpeed = 0.0;
+        depthSpeed = 0.0;
+        lastSpeedParam = 0.0;
+        lastDepthParam = 0.0;
 
         for (int i = 0; i < 16; i++) {
             sweep[i] = 3.141592653589793238 / 2.0;
@@ -99,19 +110,6 @@ struct Tremolo : Module {
         overallscale *= sampleRate;
     }
 
-    void onReset() override
-    {
-        resetNonJson(false);
-    }
-
-    void resetNonJson(bool recurseNonJson)
-    {
-    }
-
-    void onRandomize() override
-    {
-    }
-
     json_t* dataToJson() override
     {
         json_t* rootJ = json_object();
@@ -128,29 +126,19 @@ struct Tremolo : Module {
         json_t* qualityJ = json_object_get(rootJ, "quality");
         if (qualityJ)
             quality = json_integer_value(qualityJ);
-
-        resetNonJson(true);
-    }
-
-    void updateParams()
-    {
-        speedParam = params[SPEED_PARAM].getValue();
-        speedParam += inputs[SPEED_CV_INPUT].getVoltage() / 5;
-        speedParam = clamp(speedParam, 0.01f, 0.99f);
-
-        depthParam = params[DEPTH_PARAM].getValue();
-        depthParam += inputs[DEPTH_CV_INPUT].getVoltage() / 5;
-        depthParam = clamp(depthParam, 0.01f, 0.99f);
     }
 
     void process(const ProcessArgs& args) override
     {
         if (outputs[OUT_OUTPUT].isConnected()) {
 
-            // stuff that doesn't need to be processed every cycle
-            if (partTimeJob.process()) {
-                updateParams();
-            }
+            speedParam = params[SPEED_PARAM].getValue();
+            speedParam += inputs[SPEED_CV_INPUT].getVoltage() / 5;
+            speedParam = clamp(speedParam, 0.01f, 0.99f);
+
+            depthParam = params[DEPTH_PARAM].getValue();
+            depthParam += inputs[DEPTH_CV_INPUT].getVoltage() / 5;
+            depthParam = clamp(depthParam, 0.01f, 0.99f);
 
             double speed;
             double depth;
@@ -162,8 +150,6 @@ struct Tremolo : Module {
             double out;
             double bridgerectifier;
             double offset;
-            double speedSpeed;
-            double depthSpeed;
             long double inputSample;
             long double drySample;
 
@@ -173,12 +159,17 @@ struct Tremolo : Module {
             // for each poly channel
             for (int i = 0; i < numChannels; i++) {
 
-                speedChase[i] = pow(speedParam, 4);
-                depthChase[i] = depthParam;
-                speedSpeed = 300 / (fabs(lastSpeed[i] - speedChase[i]) + 1.0);
-                depthSpeed = 300 / (fabs(lastDepth[i] - depthChase[i]) + 1.0);
-                lastSpeed[i] = speedChase[i];
-                lastDepth[i] = depthChase[i];
+                if (speedParam != lastSpeedParam) {
+                    speedChase[i] = pow(speedParam, 4);
+                    speedSpeed = 300 / (fabs(lastSpeed[i] - speedChase[i]) + 1.0);
+                    lastSpeed[i] = speedChase[i];
+                }
+
+                if (depthParam != lastDepthParam) {
+                    depthChase[i] = depthParam;
+                    depthSpeed = 300 / (fabs(lastDepth[i] - depthChase[i]) + 1.0);
+                    lastDepth[i] = depthChase[i];
+                }
 
                 // input
                 inputSample = inputs[IN_INPUT].getPolyVoltage(i);
@@ -186,7 +177,7 @@ struct Tremolo : Module {
                 // pad gain
                 inputSample *= gainCut;
 
-                if (quality == 1) {
+                if (quality == HIGH) {
                     if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
                         static int noisesource = 0;
                         //this declares a variable before anything else is compiled. It won't keep assigning
@@ -264,7 +255,7 @@ struct Tremolo : Module {
                 //apply tremolo, apply gain boost to compensate for volume loss
                 inputSample = (drySample * (1 - depth)) + (inputSample * depth);
 
-                if (quality == 1) {
+                if (quality == HIGH) {
                     //stereo 32 bit dither, made small and tidy.
                     int expon;
                     frexpf((float)inputSample, &expon);

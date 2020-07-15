@@ -8,8 +8,6 @@ Ported and designed by Jens Robert Janke
 Changes/Additions:
 - polyphonic
 
-Some UI elements based on graphics from the Component Library by Wes Milholen. 
-
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
@@ -41,9 +39,8 @@ struct Interstage : Module {
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
     int quality;
-    dsp::ClockDivider partTimeJob;
 
-    // global variables (as arrays in order to handle up to 16 polyphonic channels)
+    // state variables (as arrays in order to handle up to 16 polyphonic channels)
     double iirSampleAL[16];
     double iirSampleBL[16];
     double iirSampleCL[16];
@@ -63,17 +60,24 @@ struct Interstage : Module {
     bool flipR[16];
     uint32_t fpdR[16];
 
-    // part-time variables (which do not need to be updated every cycle)
+    // other variables, which do not need to be updated every cycle
     double overallscale;
+    double firstStage;
+    double iirAmount;
+
+    // constants
+    const double threshold = 0.381966011250105;
 
     Interstage()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
         quality = loadQuality();
+        onReset();
+    }
 
-        partTimeJob.setDivision(2);
-
+    void onReset() override
+    {
         onSampleRateChange();
 
         for (int i = 0; i < 16; i++) {
@@ -93,19 +97,9 @@ struct Interstage : Module {
         overallscale = 1.0;
         overallscale /= 44100.0;
         overallscale *= sampleRate;
-    }
 
-    void onReset() override
-    {
-        resetNonJson(false);
-    }
-
-    void resetNonJson(bool recurseNonJson)
-    {
-    }
-
-    void onRandomize() override
-    {
+        firstStage = 0.381966011250105 / overallscale;
+        iirAmount = 0.00295 / overallscale;
     }
 
     json_t* dataToJson() override
@@ -124,16 +118,10 @@ struct Interstage : Module {
         json_t* qualityJ = json_object_get(rootJ, "quality");
         if (qualityJ)
             quality = json_integer_value(qualityJ);
-
-        resetNonJson(true);
     }
 
     void processChannel(Input& input, Output& output, double iirSampleA[], double iirSampleB[], double iirSampleC[], double iirSampleD[], double iirSampleE[], double iirSampleF[], long double lastSample[], bool flip[], uint32_t fpd[])
     {
-        double firstStage = 0.381966011250105 / overallscale;
-        double iirAmount = 0.00295 / overallscale;
-        double threshold = 0.381966011250105;
-
         long double inputSample;
         long double drySample;
 
@@ -159,6 +147,7 @@ struct Interstage : Module {
             inputSample = (inputSample + lastSample[i]) * 0.5; //start the lowpassing with an average
 
             if (flip[i]) {
+                //make highpass
                 iirSampleA[i] = (iirSampleA[i] * (1 - firstStage)) + (inputSample * firstStage);
                 inputSample = iirSampleA[i];
                 iirSampleC[i] = (iirSampleC[i] * (1 - iirAmount)) + (inputSample * iirAmount);
@@ -166,14 +155,15 @@ struct Interstage : Module {
                 iirSampleE[i] = (iirSampleE[i] * (1 - iirAmount)) + (inputSample * iirAmount);
                 inputSample = iirSampleE[i];
                 inputSample = drySample - inputSample;
-                //make highpass
+
+                //slew limit against lowpassed reference point
                 if (inputSample - iirSampleA[i] > threshold)
                     inputSample = iirSampleA[i] + threshold;
                 if (inputSample - iirSampleA[i] < -threshold)
                     inputSample = iirSampleA[i] - threshold;
-                //slew limit against lowpassed reference point
 
             } else {
+                //make highpass
                 iirSampleB[i] = (iirSampleB[i] * (1 - firstStage)) + (inputSample * firstStage);
                 inputSample = iirSampleB[i];
                 iirSampleD[i] = (iirSampleD[i] * (1 - iirAmount)) + (inputSample * iirAmount);
@@ -181,12 +171,12 @@ struct Interstage : Module {
                 iirSampleF[i] = (iirSampleF[i] * (1 - iirAmount)) + (inputSample * iirAmount);
                 inputSample = iirSampleF[i];
                 inputSample = drySample - inputSample;
-                //make highpass
+
+                //slew limit against lowpassed reference point
                 if (inputSample - iirSampleB[i] > threshold)
                     inputSample = iirSampleB[i] + threshold;
                 if (inputSample - iirSampleB[i] < -threshold)
                     inputSample = iirSampleB[i] - threshold;
-                //slew limit against lowpassed reference point
             }
 
             flip[i] = !flip[i];

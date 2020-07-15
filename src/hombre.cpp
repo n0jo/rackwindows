@@ -10,12 +10,14 @@ Changes/Additions:
 - CV inputs for voicing and intensity
 - polyphonic
 
-Some UI elements based on graphics from the Component Library by Wes Milholen. 
-
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
 #include "plugin.hpp"
+
+// quality options
+#define ECO 0
+#define HIGH 1
 
 struct Hombre : Module {
     enum ParamIds {
@@ -41,19 +43,18 @@ struct Hombre : Module {
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
     int quality;
-    dsp::ClockDivider partTimeJob;
 
     // control parameters
     float voicingParam;
     float intensityParam;
 
-    // global variables (as arrays in order to handle up to 16 polyphonic channels)
+    // state variables (as arrays in order to handle up to 16 polyphonic channels)
     double p[16][4001];
     double slide[16];
     int gcount[16];
     long double fpNShape[16];
 
-    // part-time variables (which do not need to be updated every cycle)
+    // other variables, which do not need to be updated every cycle
     double overallscale;
     double target;
     int widthA;
@@ -68,11 +69,12 @@ struct Hombre : Module {
         configParam(INTENSITY_PARAM, 0.f, 1.f, 0.5f, "Intensity");
 
         quality = loadQuality();
+        onReset();
+    }
 
-        partTimeJob.setDivision(2);
-
+    void onReset() override
+    {
         onSampleRateChange();
-        updateParams();
 
         for (int i = 0; i < 16; i++) {
             for (int count = 0; count < 4000; count++) {
@@ -91,19 +93,9 @@ struct Hombre : Module {
         overallscale = 1.0;
         overallscale /= 44100.0;
         overallscale *= sampleRate;
-    }
 
-    void onReset() override
-    {
-        resetNonJson(false);
-    }
-
-    void resetNonJson(bool recurseNonJson)
-    {
-    }
-
-    void onRandomize() override
-    {
+        widthA = (int)(1.0 * overallscale);
+        widthB = (int)(7.0 * overallscale); //max 364 at 44.1, 792 at 96K
     }
 
     json_t* dataToJson() override
@@ -122,35 +114,23 @@ struct Hombre : Module {
         json_t* qualityJ = json_object_get(rootJ, "quality");
         if (qualityJ)
             quality = json_integer_value(qualityJ);
-
-        resetNonJson(true);
-    }
-
-    void updateParams()
-    {
-        voicingParam = params[VOICING_PARAM].getValue();
-        voicingParam += inputs[VOICING_CV_INPUT].getVoltage() / 5;
-        voicingParam = clamp(voicingParam, 0.01f, 0.99f);
-
-        intensityParam = params[INTENSITY_PARAM].getValue();
-        intensityParam += inputs[INTENSITY_CV_INPUT].getVoltage() / 5;
-        intensityParam = clamp(intensityParam, 0.01f, 0.99f);
-
-        target = voicingParam;
-        widthA = (int)(1.0 * overallscale);
-        widthB = (int)(7.0 * overallscale); //max 364 at 44.1, 792 at 96K
-        wet = intensityParam;
-        dry = 1.0 - wet;
     }
 
     void process(const ProcessArgs& args) override
     {
         if (outputs[OUT_OUTPUT].isConnected()) {
 
-            // stuff that doesn't need to be processed every cycle
-            if (partTimeJob.process()) {
-                updateParams();
-            }
+            voicingParam = params[VOICING_PARAM].getValue();
+            voicingParam += inputs[VOICING_CV_INPUT].getVoltage() / 5;
+            voicingParam = clamp(voicingParam, 0.01f, 0.99f);
+
+            intensityParam = params[INTENSITY_PARAM].getValue();
+            intensityParam += inputs[INTENSITY_CV_INPUT].getVoltage() / 5;
+            intensityParam = clamp(intensityParam, 0.01f, 0.99f);
+
+            target = voicingParam;
+            wet = intensityParam;
+            dry = 1.0 - wet;
 
             double offsetA;
             double offsetB;
@@ -171,7 +151,7 @@ struct Hombre : Module {
                 // pad gain
                 inputSample *= gainCut;
 
-                if (quality == 1) {
+                if (quality == HIGH) {
                     if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
                         static int noisesource = 0;
                         //this declares a variable before anything else is compiled. It won't keep assigning
@@ -241,7 +221,7 @@ struct Hombre : Module {
                     inputSample = (inputSample * wet) + (drySample * dry);
                 }
 
-                if (quality == 1) {
+                if (quality == HIGH) {
                     //stereo 32 bit dither, made small and tidy.
                     int expon;
                     frexpf((float)inputSample, &expon);

@@ -10,12 +10,14 @@ Changes/Additions:
 - trigger outputs (EOC) for speed and fmspeed
 - polyphonic
 
-Some UI elements based on graphics from the Component Library by Wes Milholen. 
-
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
 #include "plugin.hpp"
+
+// quality options
+#define ECO 0
+#define HIGH 1
 
 struct Vibrato : Module {
 
@@ -52,7 +54,6 @@ struct Vibrato : Module {
     const double gainCut = 0.03125;
     const double gainBoost = 32.0;
     int quality;
-    dsp::ClockDivider partTimeJob;
     dsp::PulseGenerator eocPulse, eocFmPulse;
 
     // control parameters
@@ -62,7 +63,7 @@ struct Vibrato : Module {
     float fmDepthParam;
     float invwetParam;
 
-    // global variables (as arrays in order to handle up to 16 polyphonic channels)
+    // state variables (as arrays in order to handle up to 16 polyphonic channels)
     double p[16][16386]; //this is processed, not raw incoming samples
     double sweep[16];
     double sweepB[16];
@@ -74,13 +75,18 @@ struct Vibrato : Module {
     bool flip[16];
     uint32_t fpd[16];
 
-    // part-time variables (which do not need to be updated every cycle)
+    // other variables, which do not need to be updated every cycle
     double overallscale;
     double speed;
     double depth;
     double speedB;
     double depthB;
     double wet;
+    float lastSpeedParam;
+    float lastDepthParam;
+    float lastFmSpeedParam;
+    float lastFmDepthParam;
+    float lastInvwetParam;
 
     // constants
     const double tupi = 3.141592653589793238 * 2.0;
@@ -95,11 +101,18 @@ struct Vibrato : Module {
         configParam(INVWET_PARAM, 0.f, 1.f, 0.5f, "Inv/Wet");
 
         quality = loadQuality();
+        onReset();
+    }
 
-        partTimeJob.setDivision(2);
-
+    void onReset() override
+    {
         onSampleRateChange();
-        updateParams();
+
+        lastSpeedParam = 0.0;
+        lastDepthParam = 0.0;
+        lastFmSpeedParam = 0.0;
+        lastFmDepthParam = 0.0;
+        lastInvwetParam = 0.0;
 
         for (int i = 0; i < 16; i++) {
             for (int count = 0; count < 16385; count++) {
@@ -128,19 +141,6 @@ struct Vibrato : Module {
         overallscale *= sampleRate;
     }
 
-    void onReset() override
-    {
-        resetNonJson(false);
-    }
-
-    void resetNonJson(bool recurseNonJson)
-    {
-    }
-
-    void onRandomize() override
-    {
-    }
-
     json_t* dataToJson() override
     {
         json_t* rootJ = json_object();
@@ -157,46 +157,50 @@ struct Vibrato : Module {
         json_t* qualityJ = json_object_get(rootJ, "quality");
         if (qualityJ)
             quality = json_integer_value(qualityJ);
-
-        resetNonJson(true);
-    }
-
-    void updateParams()
-    {
-        speedParam = params[SPEED_PARAM].getValue();
-        speedParam += inputs[SPEED_CV_INPUT].getVoltage() / 5;
-        speedParam = clamp(speedParam, 0.01f, 0.99f);
-
-        depthParam = params[DEPTH_PARAM].getValue();
-        depthParam += inputs[DEPTH_CV_INPUT].getVoltage() / 5;
-        depthParam = clamp(depthParam, 0.01f, 0.99f);
-
-        fmSpeedParam = params[FMSPEED_PARAM].getValue();
-        fmSpeedParam += inputs[FMSPEED_CV_INPUT].getVoltage() / 5;
-        fmSpeedParam = clamp(fmSpeedParam, 0.01f, 0.99f);
-
-        fmDepthParam = params[FMDEPTH_PARAM].getValue();
-        fmDepthParam += inputs[FMDEPTH_CV_INPUT].getVoltage() / 5;
-        fmDepthParam = clamp(fmDepthParam, 0.01f, 0.99f);
-
-        invwetParam = params[INVWET_PARAM].getValue();
-        invwetParam += inputs[INVWET_CV_INPUT].getVoltage() / 5;
-        invwetParam = clamp(invwetParam, 0.01f, 0.99f);
-
-        speed = pow(0.1 + speedParam, 6);
-        depth = (pow(depthParam, 3) / sqrt(speed)) * 4.0;
-        speedB = pow(0.1 + fmSpeedParam, 6);
-        depthB = pow(fmDepthParam, 3) / sqrt(speedB);
-        wet = (invwetParam * 2.0) - 1.0; //note: inv/dry/wet
     }
 
     void process(const ProcessArgs& args) override
     {
         if (outputs[OUT_OUTPUT].isConnected() || outputs[EOC_OUTPUT].isConnected() || outputs[EOC_FM_OUTPUT].isConnected()) {
 
-            // stuff that doesn't need to be processed every cycle
-            if (partTimeJob.process()) {
-                updateParams();
+            speedParam = params[SPEED_PARAM].getValue();
+            speedParam += inputs[SPEED_CV_INPUT].getVoltage() / 5;
+            speedParam = clamp(speedParam, 0.01f, 0.99f);
+
+            depthParam = params[DEPTH_PARAM].getValue();
+            depthParam += inputs[DEPTH_CV_INPUT].getVoltage() / 5;
+            depthParam = clamp(depthParam, 0.01f, 0.99f);
+
+            fmSpeedParam = params[FMSPEED_PARAM].getValue();
+            fmSpeedParam += inputs[FMSPEED_CV_INPUT].getVoltage() / 5;
+            fmSpeedParam = clamp(fmSpeedParam, 0.01f, 0.99f);
+
+            fmDepthParam = params[FMDEPTH_PARAM].getValue();
+            fmDepthParam += inputs[FMDEPTH_CV_INPUT].getVoltage() / 5;
+            fmDepthParam = clamp(fmDepthParam, 0.01f, 0.99f);
+
+            invwetParam = params[INVWET_PARAM].getValue();
+            invwetParam += inputs[INVWET_CV_INPUT].getVoltage() / 5;
+            invwetParam = clamp(invwetParam, 0.01f, 0.99f);
+
+            if (speedParam != lastSpeedParam) {
+                speed = pow(0.1 + speedParam, 6);
+            }
+
+            if (depthParam != lastDepthParam) {
+                depth = (pow(depthParam, 3) / sqrt(speed)) * 4.0;
+            }
+
+            if (fmSpeedParam != lastFmSpeedParam) {
+                speedB = pow(0.1 + fmSpeedParam, 6);
+            }
+
+            if (fmDepthParam != lastFmDepthParam) {
+                depthB = pow(fmDepthParam, 3) / sqrt(speedB);
+            }
+
+            if (invwetParam != lastInvwetParam) {
+                wet = (invwetParam * 2.0) - 1.0; //note: inv/dry/wet
             }
 
             // number of polyphonic channels
@@ -211,7 +215,7 @@ struct Vibrato : Module {
                 // pad gain
                 inputSample *= gainCut;
 
-                if (quality == 1) {
+                if (quality == HIGH) {
                     if (fabs(inputSample) < 1.18e-37)
                         inputSample = fpd[i] * 1.18e-37;
                 }
@@ -272,7 +276,7 @@ struct Vibrato : Module {
                     inputSample = (inputSample * wet) + (drySample * (1.0 - fabs(wet)));
                 }
 
-                if (quality == 1) {
+                if (quality == HIGH) {
                     //begin 32 bit stereo floating point dither
                     int expon;
                     frexpf((float)inputSample, &expon);

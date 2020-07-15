@@ -10,12 +10,14 @@ Changes/Additions:
 - CV inputs for speed and range
 - polyphonic
 
-Some UI elements based on graphics from the Component Library by Wes Milholen. 
-
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
 #include "plugin.hpp"
+
+// quality options
+#define ECO 0
+#define HIGH 1
 
 struct Chorus : Module {
     enum ParamIds {
@@ -47,14 +49,13 @@ struct Chorus : Module {
     const double gainBoost = 32.0;
     int quality;
     bool isEnsemble;
-    dsp::ClockDivider partTimeJob;
 
     // control parameters
     float speedParam;
     float rangeParam;
     float drywetParam;
 
-    // global variables (as arrays in order to handle up to 16 polyphonic channels)
+    // state variables (as arrays in order to handle up to 16 polyphonic channels)
     const static int totalsamples = 16386;
     float d[16][totalsamples];
     double sweepL[16];
@@ -74,7 +75,7 @@ struct Chorus : Module {
     long double fpNShapeL[16];
     long double fpNShapeR[16];
 
-    // part-time variables (which do not need to be updated every cycle)
+    // other
     double overallscale;
 
     Chorus()
@@ -85,14 +86,14 @@ struct Chorus : Module {
         configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
         configParam(ENSEMBLE_PARAM, 0.f, 1.f, 0.f, "Ensemble");
 
-        quality = 1;
         quality = loadQuality();
         isEnsemble = false;
+        onReset();
+    }
 
-        partTimeJob.setDivision(2);
-
+    void onReset() override
+    {
         onSampleRateChange();
-        updateParams();
 
         for (int i = 0; i < 16; i++) {
             for (int count = 0; count < totalsamples - 1; count++) {
@@ -115,7 +116,6 @@ struct Chorus : Module {
             fpNShapeL[i] = 0.0;
             fpNShapeR[i] = 0.0;
         }
-        //this is reset: values being initialized only once. Startup values, whatever they are.
     }
 
     void onSampleRateChange() override
@@ -125,19 +125,6 @@ struct Chorus : Module {
         overallscale = 1.0;
         overallscale /= 44100.0;
         overallscale *= sampleRate;
-    }
-
-    void onReset() override
-    {
-        resetNonJson(false);
-    }
-
-    void resetNonJson(bool recurseNonJson)
-    {
-    }
-
-    void onRandomize() override
-    {
     }
 
     json_t* dataToJson() override
@@ -156,26 +143,21 @@ struct Chorus : Module {
         json_t* qualityJ = json_object_get(rootJ, "quality");
         if (qualityJ)
             quality = json_integer_value(qualityJ);
-
-        resetNonJson(true);
-    }
-
-    void updateParams()
-    {
-        speedParam = params[SPEED_PARAM].getValue();
-        speedParam += inputs[SPEED_CV_INPUT].getVoltage() / 5;
-        speedParam = clamp(speedParam, 0.01f, 0.99f);
-
-        rangeParam = params[RANGE_PARAM].getValue();
-        rangeParam += inputs[RANGE_CV_INPUT].getVoltage() / 5;
-        rangeParam = clamp(rangeParam, 0.01f, 0.99f);
-
-        drywetParam = params[DRYWET_PARAM].getValue();
     }
 
     void processChannel(Input& input, Output& output, double sweep[], int gcount[], double airPrev[], double airEven[], double airOdd[], double airFactor[], bool fpFlip[], long double fpNShape[])
     {
-        if (input.isConnected()) {
+        if (output.isConnected()) {
+
+            speedParam = params[SPEED_PARAM].getValue();
+            speedParam += inputs[SPEED_CV_INPUT].getVoltage() / 5;
+            speedParam = clamp(speedParam, 0.01f, 0.99f);
+
+            rangeParam = params[RANGE_PARAM].getValue();
+            rangeParam += inputs[RANGE_CV_INPUT].getVoltage() / 5;
+            rangeParam = clamp(rangeParam, 0.01f, 0.99f);
+
+            drywetParam = params[DRYWET_PARAM].getValue();
 
             double speed = 0.0;
             double range = 0.0;
@@ -221,7 +203,7 @@ struct Chorus : Module {
                 // pad gain
                 inputSample *= gainCut;
 
-                if (quality == 1) {
+                if (quality == HIGH) {
                     if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
                         static int noisesource = 0;
                         //this declares a variable before anything else is compiled. It won't keep assigning
@@ -331,7 +313,7 @@ struct Chorus : Module {
                 }
                 fpFlip[i] = !fpFlip[i];
 
-                if (quality == 1) {
+                if (quality == HIGH) {
                     //stereo 32 bit dither, made small and tidy.
                     int expon;
                     frexpf((float)inputSample, &expon);
@@ -353,11 +335,6 @@ struct Chorus : Module {
     void process(const ProcessArgs& args) override
     {
         if (outputs[OUT_L_OUTPUT].isConnected() || outputs[OUT_R_OUTPUT].isConnected()) {
-
-            if (partTimeJob.process()) {
-                // stuff that doesn't need to be processed every cycle
-                updateParams();
-            }
 
             // process L
             processChannel(inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT], sweepL, gcountL, airPrevL, airEvenL, airOddL, airFactorL, fpFlipL, fpNShapeL);
