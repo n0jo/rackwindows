@@ -12,30 +12,28 @@ Changes/Additions:
 - if linked, bottom knob acts as an offset
 - polyphonic
 
-Some UI elements based on graphics from the Component Library by Wes Milholen. 
-
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
-// CAUTION: as of now, output is not limited in any way, positive values can produce very high volumes
+// CAUTION: the output is not limited in any way, positive values can produce very high volumes
 
 #include "plugin.hpp"
 
 struct Bitshiftgain : Module {
     enum ParamIds {
-        SHIFT1_PARAM,
-        SHIFT2_PARAM,
+        SHIFT_A_PARAM,
+        SHIFT_B_PARAM,
         LINK_PARAM,
         NUM_PARAMS
     };
     enum InputIds {
-        IN1_INPUT,
-        IN2_INPUT,
+        IN_A_INPUT,
+        IN_B_INPUT,
         NUM_INPUTS
     };
     enum OutputIds {
-        OUT1_OUTPUT,
-        OUT2_OUTPUT,
+        OUT_A_OUTPUT,
+        OUT_B_OUTPUT,
         NUM_OUTPUTS
     };
     enum LightIds {
@@ -43,27 +41,36 @@ struct Bitshiftgain : Module {
         NUM_LIGHTS
     };
 
-    int shift1;
-    int shift2;
-
+    int shiftA;
+    int shiftB;
     bool isLinked;
+    double lastSampleA; // for zero crossing detection
+    double lastSampleB; // for zero crossing detection
 
     Bitshiftgain()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(SHIFT1_PARAM, -8.0, 8.0, 0.0, "Shift");
-        configParam(SHIFT2_PARAM, -8.0, 8.0, 0.0, "Shift/Offset");
+        configParam(SHIFT_A_PARAM, -8.0, 8.0, 0.0, "Shift");
+        configParam(SHIFT_B_PARAM, -8.0, 8.0, 0.0, "Shift/Offset");
         configParam(LINK_PARAM, 0.f, 1.f, 0.0, "Link");
 
-        shift1 = shift2 = 0;
+        onReset();
+    }
 
+    void onReset() override
+    {
+        shiftA = 0;
+        shiftB = 0;
         isLinked = false;
+        lastSampleA = 0.0;
+        lastSampleB = 0.0;
     }
 
     double bitShift(int bitshiftGain)
     {
         double gain = 1.0;
 
+        //we are directly punching in the gain values rather than calculating them
         switch (bitshiftGain) {
         case -16:
             gain = 0.0000152587890625;
@@ -165,66 +172,79 @@ struct Bitshiftgain : Module {
             gain = 65536.0;
             break;
         }
-        //we are directly punching in the gain values rather than calculating them
 
         return gain;
     }
 
     void process(const ProcessArgs& args) override
     {
-        // get knob parameters
-        shift1 = params[SHIFT1_PARAM].getValue();
-        shift2 = params[SHIFT2_PARAM].getValue();
-
         // link
         isLinked = params[LINK_PARAM].getValue() ? true : false;
+        lights[LINK_LIGHT].setBrightness(isLinked);
 
-        // upper section
-        if (inputs[IN1_INPUT].isConnected()) {
+        /* section A
+        =============================================================================== */
+
+        if (inputs[IN_A_INPUT].isConnected()) {
+
             // get number of polyphonic channels
-            int numChannels1 = inputs[IN1_INPUT].getChannels();
+            int numChannelsA = inputs[IN_A_INPUT].getChannels();
 
             // set number of output channels
-            outputs[OUT1_OUTPUT].setChannels(numChannels1);
+            outputs[OUT_A_OUTPUT].setChannels(numChannelsA);
 
-            for (int i = 0; i < numChannels1; i++) {
+            // update shiftA only at zero crossings (of first channel) to reduce clicks on parameter changes
+            // reasonably effective on most sources, but will not happen across multiple channels, therefore monophonic only
+            bool isZero = (inputs[IN_A_INPUT].getVoltage() * lastSampleA < 0.0);
+            shiftA = isZero ? params[SHIFT_A_PARAM].getValue() : shiftA;
+            lastSampleA = inputs[IN_A_INPUT].getVoltage();
+
+            // for each poly channel
+            for (int i = 0; i < numChannelsA; i++) {
                 // shift signal in 6db steps
-                outputs[OUT1_OUTPUT].setVoltage(inputs[IN1_INPUT].getPolyVoltage(i) * bitShift(shift1), i);
+                outputs[OUT_A_OUTPUT].setVoltage(inputs[IN_A_INPUT].getPolyVoltage(i) * bitShift(shiftA), i);
             }
         } else {
             // output -8 to 8 in 1V steps if no input is connected
-            outputs[OUT1_OUTPUT].setVoltage(shift1);
+            outputs[OUT_A_OUTPUT].setVoltage(params[SHIFT_A_PARAM].getValue());
         }
 
-        // lower section
-        if (inputs[IN2_INPUT].isConnected()) {
+        /* section B
+        =============================================================================== */
+
+        if (inputs[IN_B_INPUT].isConnected()) {
+
             // get number of polyphonic channels
-            int numChannels2 = inputs[IN2_INPUT].getChannels();
+            int numChannelsB = inputs[IN_B_INPUT].getChannels();
 
             // set number of output channels
-            outputs[OUT2_OUTPUT].setChannels(numChannels2);
+            outputs[OUT_B_OUTPUT].setChannels(numChannelsB);
 
-            for (int i = 0; i < numChannels2; i++) {
+            // update shiftB only at zero crossings (of first channel) to reduce clicks on parameter changes
+            // reasonably effective on most sources, but will not happen across multiple channels, therefore monophonic only
+            bool isZero = (inputs[IN_B_INPUT].getVoltage() * lastSampleB < 0.0);
+            shiftB = isZero ? params[SHIFT_B_PARAM].getValue() : shiftB;
+            lastSampleB = inputs[IN_B_INPUT].getVoltage();
+
+            // for each poly channel
+            for (int i = 0; i < numChannelsB; i++) {
                 if (isLinked) {
-                    if (inputs[IN1_INPUT].isConnected()) {
+                    if (inputs[IN_A_INPUT].isConnected()) {
                         // offset signal in 6db steps
-                        outputs[OUT2_OUTPUT].setVoltage(inputs[IN2_INPUT].getPolyVoltage(i) * bitShift(-shift1 + shift2), i);
+                        outputs[OUT_B_OUTPUT].setVoltage(inputs[IN_B_INPUT].getPolyVoltage(i) * bitShift(-shiftA + shiftB), i);
                     } else {
                         // offset signal in 1V steps
-                        outputs[OUT2_OUTPUT].setVoltage(inputs[IN2_INPUT].getPolyVoltage(i) + shift2, i);
+                        outputs[OUT_B_OUTPUT].setVoltage(inputs[IN_B_INPUT].getPolyVoltage(i) + params[SHIFT_B_PARAM].getValue(), i);
                     }
                 } else {
                     // shift signal in 6db steps
-                    outputs[OUT2_OUTPUT].setVoltage(inputs[IN2_INPUT].getPolyVoltage(i) * bitShift(shift2), i);
+                    outputs[OUT_B_OUTPUT].setVoltage(inputs[IN_B_INPUT].getPolyVoltage(i) * bitShift(shiftB), i);
                 }
             }
         } else {
             // output -8 to 8 in 1V steps if no input is connected
-            outputs[OUT2_OUTPUT].setVoltage(shift2);
+            outputs[OUT_B_OUTPUT].setVoltage(params[SHIFT_B_PARAM].getValue());
         }
-
-        // link light
-        lights[LINK_LIGHT].setBrightness(isLinked);
     }
 };
 
@@ -239,8 +259,8 @@ struct BitshiftgainWidget : ModuleWidget {
         addChild(createWidget<ScrewBlack>(Vec(RACK_GRID_WIDTH * 1.5, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         // knobs
-        addParam(createParamCentered<RwSwitchKnobMediumDark>(Vec(30.0, 65.0), module, Bitshiftgain::SHIFT1_PARAM));
-        addParam(createParamCentered<RwSwitchKnobMediumDark>(Vec(30.0, 235.0), module, Bitshiftgain::SHIFT2_PARAM));
+        addParam(createParamCentered<RwSwitchKnobMediumDark>(Vec(30.0, 65.0), module, Bitshiftgain::SHIFT_A_PARAM));
+        addParam(createParamCentered<RwSwitchKnobMediumDark>(Vec(30.0, 235.0), module, Bitshiftgain::SHIFT_B_PARAM));
 
         // switches
         addParam(createParamCentered<RwCKSSRot>(Vec(30.0, 195.0), module, Bitshiftgain::LINK_PARAM));
@@ -249,12 +269,12 @@ struct BitshiftgainWidget : ModuleWidget {
         addChild(createLightCentered<SmallLight<GreenLight>>(Vec(48, 195), module, Bitshiftgain::LINK_LIGHT));
 
         // inputs
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(30.0, 115.0), module, Bitshiftgain::IN1_INPUT));
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(30.0, 285.0), module, Bitshiftgain::IN2_INPUT));
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(30.0, 115.0), module, Bitshiftgain::IN_A_INPUT));
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(30.0, 285.0), module, Bitshiftgain::IN_B_INPUT));
 
         // outputs
-        addOutput(createOutputCentered<RwPJ301MPort>(Vec(30.0, 155.0), module, Bitshiftgain::OUT1_OUTPUT));
-        addOutput(createOutputCentered<RwPJ301MPort>(Vec(30.0, 325.0), module, Bitshiftgain::OUT2_OUTPUT));
+        addOutput(createOutputCentered<RwPJ301MPort>(Vec(30.0, 155.0), module, Bitshiftgain::OUT_A_OUTPUT));
+        addOutput(createOutputCentered<RwPJ301MPort>(Vec(30.0, 325.0), module, Bitshiftgain::OUT_B_OUTPUT));
     }
 };
 
