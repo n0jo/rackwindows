@@ -173,10 +173,6 @@ struct Tape : Module {
                 lastBumpParam = bumpParam;
             }
 
-            float in[16] = {};
-            float out[16] = {};
-            int numChannels = 1;
-
             double suppress;
             long double drySample;
             long double highsSample;
@@ -188,12 +184,10 @@ struct Tape : Module {
             double K;
             double norm;
 
-            if (input.isConnected()) {
-                // get input
-                numChannels = input.getChannels();
-                input.readVoltages(in);
-            }
+            // number of polyphonic channels
+            int numChannels = std::max(1, input.getChannels());
 
+            // for each poly channel
             for (int i = 0; i < numChannels; i++) {
 
                 if (processDivider.process()) {
@@ -217,7 +211,8 @@ struct Tape : Module {
                     biquadC[i][6] = biquadD[i][6] = (1.0 - K / biquadD[i][1] + K * K) * norm;
                 }
 
-                inputSample = in[i];
+                // input
+                inputSample = input.getPolyVoltage(i);
 
                 // pad gain
                 inputSample *= gainCut;
@@ -293,12 +288,15 @@ struct Tape : Module {
                 }
                 flip[i] = !flip[i];
 
-                groundSample = drySample - inputSample; //set up UnBox
+                //set up UnBox
+                groundSample = drySample - inputSample;
 
+                //gain boost inside UnBox: do not boost fringe audio
                 if (inputgain != 1.0) {
                     inputSample *= inputgain;
-                } //gain boost inside UnBox: do not boost fringe audio
+                }
 
+                //apply Soften depending on polarity
                 applySoften = fabs(highsSample) * 1.57079633;
                 if (applySoften > 1.57079633)
                     applySoften = 1.57079633;
@@ -307,16 +305,17 @@ struct Tape : Module {
                     inputSample -= applySoften;
                 if (highsSample < 0)
                     inputSample += applySoften;
-                //apply Soften depending on polarity
 
+                //clip to 1.2533141373155 to reach maximum output
                 if (inputSample > 1.2533141373155)
                     inputSample = 1.2533141373155;
                 if (inputSample < -1.2533141373155)
                     inputSample = -1.2533141373155;
-                //clip to 1.2533141373155 to reach maximum output
-                inputSample = sin(inputSample * fabs(inputSample)) / ((inputSample == 0.0) ? 1 : fabs(inputSample));
-                //Spiral, for cleanest most optimal tape effect
 
+                //Spiral, for cleanest most optimal tape effect
+                inputSample = sin(inputSample * fabs(inputSample)) / ((inputSample == 0.0) ? 1 : fabs(inputSample));
+
+                //restrain resonant quality of head bump algorithm
                 suppress = (1.0 - fabs(inputSample)) * 0.00013;
                 if (iirHeadBumpA[i] > suppress)
                     iirHeadBumpA[i] -= suppress;
@@ -326,12 +325,14 @@ struct Tape : Module {
                     iirHeadBumpB[i] -= suppress;
                 if (iirHeadBumpB[i] < -suppress)
                     iirHeadBumpB[i] += suppress;
-                //restrain resonant quality of head bump algorithm
 
-                inputSample += groundSample; //apply UnBox processing
+                //apply UnBox processing
+                inputSample += groundSample;
 
-                inputSample += ((iirHeadBumpA[i] + iirHeadBumpB[i]) * bumpgain); //and head bump
+                //apply and head bump
+                inputSample += ((iirHeadBumpA[i] + iirHeadBumpB[i]) * bumpgain);
 
+                //ADClip
                 if (lastSample[i] >= 0.99) {
                     if (inputSample < 0.99)
                         lastSample[i] = ((0.99 * softness) + (inputSample * (1.0 - softness)));
@@ -359,33 +360,32 @@ struct Tape : Module {
                     else
                         inputSample = -0.99;
                 }
-                lastSample[i] = inputSample; //end ADClip R
+                lastSample[i] = inputSample;
 
+                //final iron bar
                 if (inputSample > 0.99)
                     inputSample = 0.99;
                 if (inputSample < -0.99)
                     inputSample = -0.99;
-                //final iron bar
 
                 if (quality == HIGH) {
-                    //begin 32 bit stereo floating point dither
+                    //32 bit stereo floating point dither
                     int expon;
                     frexpf((float)inputSample, &expon);
                     fpd[i] ^= fpd[i] << 13;
                     fpd[i] ^= fpd[i] >> 17;
                     fpd[i] ^= fpd[i] << 5;
                     inputSample += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
-                    //end 32 bit stereo floating point dither
                 }
 
                 // bring gain back up
                 inputSample *= gainBoost;
 
-                out[i] = inputSample;
-            }
-            // output
-            output.setChannels(numChannels);
-            output.writeVoltages(out);
+                // output
+                output.setChannels(numChannels);
+                output.setVoltage(inputSample, i);
+
+            } // end poly channel loop
         }
     }
 
