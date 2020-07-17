@@ -122,84 +122,87 @@ struct Interstage : Module {
 
     void processChannel(Input& input, Output& output, double iirSampleA[], double iirSampleB[], double iirSampleC[], double iirSampleD[], double iirSampleE[], double iirSampleF[], long double lastSample[], bool flip[], uint32_t fpd[])
     {
-        long double inputSample;
-        long double drySample;
+        if (output.isConnected()) {
 
-        // number of polyphonic channels
-        int numChannels = input.getChannels();
+            long double inputSample;
+            long double drySample;
 
-        // for each poly channel
-        for (int i = 0; i < numChannels; i++) {
+            // number of polyphonic channels
+            int numChannels = std::max(1, input.getChannels());
 
-            // input
-            inputSample = input.getPolyVoltage(i);
+            // for each poly channel
+            for (int i = 0; i < numChannels; i++) {
 
-            // pad gain
-            inputSample *= gainCut;
+                // input
+                inputSample = input.getPolyVoltage(i);
 
-            if (quality == HIGH) {
-                if (fabs(inputSample) < 1.18e-37)
-                    inputSample = fpd[i] * 1.18e-37;
+                // pad gain
+                inputSample *= gainCut;
+
+                if (quality == HIGH) {
+                    if (fabs(inputSample) < 1.18e-37)
+                        inputSample = fpd[i] * 1.18e-37;
+                }
+
+                drySample = inputSample;
+
+                inputSample = (inputSample + lastSample[i]) * 0.5; //start the lowpassing with an average
+
+                if (flip[i]) {
+                    //make highpass
+                    iirSampleA[i] = (iirSampleA[i] * (1 - firstStage)) + (inputSample * firstStage);
+                    inputSample = iirSampleA[i];
+                    iirSampleC[i] = (iirSampleC[i] * (1 - iirAmount)) + (inputSample * iirAmount);
+                    inputSample = iirSampleC[i];
+                    iirSampleE[i] = (iirSampleE[i] * (1 - iirAmount)) + (inputSample * iirAmount);
+                    inputSample = iirSampleE[i];
+                    inputSample = drySample - inputSample;
+
+                    //slew limit against lowpassed reference point
+                    if (inputSample - iirSampleA[i] > threshold)
+                        inputSample = iirSampleA[i] + threshold;
+                    if (inputSample - iirSampleA[i] < -threshold)
+                        inputSample = iirSampleA[i] - threshold;
+
+                } else {
+                    //make highpass
+                    iirSampleB[i] = (iirSampleB[i] * (1 - firstStage)) + (inputSample * firstStage);
+                    inputSample = iirSampleB[i];
+                    iirSampleD[i] = (iirSampleD[i] * (1 - iirAmount)) + (inputSample * iirAmount);
+                    inputSample = iirSampleD[i];
+                    iirSampleF[i] = (iirSampleF[i] * (1 - iirAmount)) + (inputSample * iirAmount);
+                    inputSample = iirSampleF[i];
+                    inputSample = drySample - inputSample;
+
+                    //slew limit against lowpassed reference point
+                    if (inputSample - iirSampleB[i] > threshold)
+                        inputSample = iirSampleB[i] + threshold;
+                    if (inputSample - iirSampleB[i] < -threshold)
+                        inputSample = iirSampleB[i] - threshold;
+                }
+
+                flip[i] = !flip[i];
+
+                lastSample[i] = inputSample;
+
+                if (quality == HIGH) {
+                    //begin 32 bit stereo floating point dither
+                    int expon;
+                    frexpf((float)inputSample, &expon);
+                    fpd[i] ^= fpd[i] << 13;
+                    fpd[i] ^= fpd[i] >> 17;
+                    fpd[i] ^= fpd[i] << 5;
+                    inputSample += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
+                    //end 32 bit stereo floating point dither
+                }
+
+                // bring gain back up
+                inputSample *= gainBoost;
+
+                // output
+                output.setChannels(numChannels);
+                output.setVoltage(inputSample, i);
             }
-
-            drySample = inputSample;
-
-            inputSample = (inputSample + lastSample[i]) * 0.5; //start the lowpassing with an average
-
-            if (flip[i]) {
-                //make highpass
-                iirSampleA[i] = (iirSampleA[i] * (1 - firstStage)) + (inputSample * firstStage);
-                inputSample = iirSampleA[i];
-                iirSampleC[i] = (iirSampleC[i] * (1 - iirAmount)) + (inputSample * iirAmount);
-                inputSample = iirSampleC[i];
-                iirSampleE[i] = (iirSampleE[i] * (1 - iirAmount)) + (inputSample * iirAmount);
-                inputSample = iirSampleE[i];
-                inputSample = drySample - inputSample;
-
-                //slew limit against lowpassed reference point
-                if (inputSample - iirSampleA[i] > threshold)
-                    inputSample = iirSampleA[i] + threshold;
-                if (inputSample - iirSampleA[i] < -threshold)
-                    inputSample = iirSampleA[i] - threshold;
-
-            } else {
-                //make highpass
-                iirSampleB[i] = (iirSampleB[i] * (1 - firstStage)) + (inputSample * firstStage);
-                inputSample = iirSampleB[i];
-                iirSampleD[i] = (iirSampleD[i] * (1 - iirAmount)) + (inputSample * iirAmount);
-                inputSample = iirSampleD[i];
-                iirSampleF[i] = (iirSampleF[i] * (1 - iirAmount)) + (inputSample * iirAmount);
-                inputSample = iirSampleF[i];
-                inputSample = drySample - inputSample;
-
-                //slew limit against lowpassed reference point
-                if (inputSample - iirSampleB[i] > threshold)
-                    inputSample = iirSampleB[i] + threshold;
-                if (inputSample - iirSampleB[i] < -threshold)
-                    inputSample = iirSampleB[i] - threshold;
-            }
-
-            flip[i] = !flip[i];
-
-            lastSample[i] = inputSample;
-
-            if (quality == HIGH) {
-                //begin 32 bit stereo floating point dither
-                int expon;
-                frexpf((float)inputSample, &expon);
-                fpd[i] ^= fpd[i] << 13;
-                fpd[i] ^= fpd[i] >> 17;
-                fpd[i] ^= fpd[i] << 5;
-                inputSample += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
-                //end 32 bit stereo floating point dither
-            }
-
-            // bring gain back up
-            inputSample *= gainBoost;
-
-            // output
-            output.setChannels(numChannels);
-            output.setVoltage(inputSample, i);
         }
     }
 

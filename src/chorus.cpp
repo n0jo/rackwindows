@@ -188,17 +188,18 @@ struct Chorus : Module {
             //this is a double buffer so we will be splitting it in two
 
             double drySample;
+            long double inputSample;
 
             speed *= overallscale;
 
             // input
-            int numChannels = input.getChannels();
+            int numChannels = std::max(1, input.getChannels());
 
             // for each poly channel
             for (int i = 0; i < numChannels; i++) {
 
                 // input
-                long double inputSample = input.getPolyVoltage(i);
+                inputSample = input.getPolyVoltage(i);
 
                 // pad gain
                 inputSample *= gainCut;
@@ -334,13 +335,10 @@ struct Chorus : Module {
     }
     void process(const ProcessArgs& args) override
     {
-        if (outputs[OUT_L_OUTPUT].isConnected() || outputs[OUT_R_OUTPUT].isConnected()) {
-
-            // process L
-            processChannel(inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT], sweepL, gcountL, airPrevL, airEvenL, airOddL, airFactorL, fpFlipL, fpNShapeL);
-            // process R
-            processChannel(inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT], sweepR, gcountR, airPrevR, airEvenR, airOddR, airFactorR, fpFlipR, fpNShapeR);
-        }
+        // process L
+        processChannel(inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT], sweepL, gcountL, airPrevL, airEvenL, airOddL, airFactorL, fpFlipL, fpNShapeL);
+        // process R
+        processChannel(inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT], sweepR, gcountR, airPrevR, airEvenR, airOddR, airFactorR, fpFlipR, fpNShapeR);
 
         // ensemble light
         isEnsemble = params[ENSEMBLE_PARAM].getValue() ? true : false;

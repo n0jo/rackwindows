@@ -204,7 +204,7 @@ struct Vibrato : Module {
             }
 
             // number of polyphonic channels
-            int numChannels = inputs[IN_INPUT].getChannels();
+            int numChannels = std::max(1, inputs[IN_INPUT].getChannels());
 
             // for each poly channel
             for (int i = 0; i < numChannels; i++) {
