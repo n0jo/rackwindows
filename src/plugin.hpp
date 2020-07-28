@@ -15,6 +15,7 @@ extern Model* modelCapacitor_stereo;
 extern Model* modelChorus;
 extern Model* modelConsole;
 extern Model* modelDistance;
+extern Model* modelHolt;
 extern Model* modelHombre;
 extern Model* modelInterstage;
 extern Model* modelMv;

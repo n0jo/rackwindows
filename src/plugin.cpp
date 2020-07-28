@@ -13,6 +13,7 @@ void init(Plugin* p)
     p->addModel(modelChorus);
     p->addModel(modelConsole);
     p->addModel(modelDistance);
+    p->addModel(modelHolt);
     p->addModel(modelHombre);
     p->addModel(modelInterstage);
     p->addModel(modelMv);
