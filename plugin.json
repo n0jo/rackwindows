@@ -77,7 +77,7 @@
     {
       "slug": "holt",
       "name": "Holt",
-      "description": "Filter based on an Excel method for predicting sales figures",
+      "description": "Resonant lowpass filter focussed on low frequencies",
       "tags": [
         "Filter",
         "Polyphonic"
