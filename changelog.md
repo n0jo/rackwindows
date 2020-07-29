@@ -1,7 +1,8 @@
 
-### 1.1.1 (17-07-2020)
+### 1.1.1 (29-07-2020)
+- New module: Holt
 - ResEQ: Fixed parameter scaling and glitches
-- Tape: Significantly improved performance
+- Tape: Improved performance
 - DualBSG: Minimized clicks on parameter changes (monophonic only)
 - Hombre: Removed wrong tag
 - Some modules: Fixed a bug, where the last voltage would be output after disconnection of input

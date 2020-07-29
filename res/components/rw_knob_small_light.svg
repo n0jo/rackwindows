@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="20px" height="20px" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;">
-    <g id="knobSDark">
-        <path id="path3832" d="M10,19.148c-3.263,0 -1.404,1.66 -4.347,0.211c-2.942,-1.447 -0.511,-0.995 -2.549,-3.617c-2.039,-2.621 -2.152,-0.086 -2.876,-3.33c-0.724,-3.246 0.444,-1.03 1.174,-4.276c0.73,-3.245 -1.275,-1.745 0.764,-4.349c2.038,-2.604 1.067,-0.286 4.009,-1.717c2.943,-1.431 0.562,-2.118 3.825,-2.118c3.263,0 0.887,0.67 3.825,2.118c2.937,1.448 1.971,-0.87 4.009,1.717c2.039,2.587 0.034,1.145 0.764,4.367c0.73,3.222 1.898,1.03 1.174,4.275c-0.724,3.245 -0.843,0.727 -2.876,3.33c-2.032,2.605 0.393,2.153 -2.549,3.6c-2.943,1.449 -1.084,-0.211 -4.347,-0.211Z" style="fill:rgb(51,51,51);"/>
-        <path d="M10,9.952l0,-10" style="fill:none;stroke:white;stroke-width:0.95px;"/>
-    </g>
-</svg>

@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="34px" height="34px" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;">
-    <g id="knobMLight">
-        <path id="path3832" d="M17,32.632c-5.547,0 -2.387,2.822 -7.39,0.36c-5.002,-2.461 -0.868,-1.693 -4.334,-6.149c-3.466,-4.456 -3.657,-0.146 -4.888,-5.662c-1.232,-5.517 0.754,-1.752 1.995,-7.268c1.241,-5.517 -2.167,-2.968 1.299,-7.394c3.465,-4.427 1.814,-0.487 6.816,-2.919c5.003,-2.432 0.955,-3.6 6.502,-3.6c5.547,0 1.508,1.138 6.502,3.6c4.993,2.461 3.351,-1.479 6.816,2.919c3.466,4.397 0.058,1.946 1.299,7.423c1.241,5.478 3.227,1.751 1.995,7.268c-1.231,5.516 -1.432,1.236 -4.888,5.662c-3.456,4.427 0.668,3.659 -4.334,6.12c-5.003,2.462 -1.843,-0.36 -7.39,-0.36Z" style="fill:rgb(51,51,51);fill-rule:nonzero;"/>
-        <path d="M17,17l0,-17" style="fill:none;fill-rule:nonzero;stroke:white;stroke-width:1.61px;"/>
-    </g>
-</svg>
