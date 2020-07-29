@@ -2,13 +2,13 @@
 
 ![Rackwindows Modules](res/images/rackwindows_panels.jpg)
 
-**NOTE** As of now some modules don't behave correctly at sample rates other than 44100 Hz. They simply don't scale as they should. Looking for a fix.
-
 Most of these modules are straight-up ports of [Airwindows](http://www.airwindows.com) plugins with the addition of a panel (designed to be potentially buildable in hardware) and the occasional tweak or enhancement to take advantage of the modular environment.
 
 Airwindows plugins are known for exceptional sound quality, innovative approaches and minimalist interfaces. They often focus on and excel at one specific task, which is why I think they are a natural fit for Rack.
 
 For more in-depth information about the inner workings of a particular Airwindows plugin please check Chris' [website](http://www.airwindows.com). There is a video on every plugin along with a description and I encourage everyone to explore his body of work. Chances are you stumble upon other gems here and there. He's got a [Patreon](https://www.patreon.com/airwindows) in case you appreciate and want to support what he does.
+
+**NOTE:** Some modules act a bit differently depending on the selected sample rate and I'm looking for a fix. Keep in mind that some Airwindows plugins are actually sample rate dependent, therefore in some cases it might indeed be a feature, not a bug. There are definitely differences though between the plugin versions and the ported modules with regards to sample rate and I haven't found the explanation yet, let alone a solution. As far as I can tell, all modules behave correctly at 44.1 kHz.
 
 ## Licence
 
@@ -21,6 +21,7 @@ See [LICENSE.md](LICENSE.md) for all licenses
 - [Console](#console): Stereo summing mixer
 - [Distance](#distance): Designed to mimic through-air high frequency attenuation
 - [Dual BSG](#dual-bsg): Dual gain shifter
+- [Holt](#holt): Resonant lowpass filter focussed on low frequencies
 - [Hombre](#hombre): Texas tone and texture
 - [Interstage](#interstage): Subtle analogifier
 - [MV](#mv): Dual-mono reverb
@@ -35,7 +36,7 @@ Filters
 
 ![Rackwindows Capacitor](res/images/capacitor_panels.jpg)
 
-Comes in both mono and stereo, with the stereo version featuring an additional dry/wet control.
+High/Lowpass filters that come in both mono and stereo, with the stereo version featuring an additional dry/wet control.
 
 [More information](http://www.airwindows.com/capacitor)
 
@@ -57,7 +58,7 @@ Airwindows Console systems sum signals in a way where the resulting soundstage a
 
 Please check the link below for further information on how exactly this effect is achieved.
 
-**NOTE**: Due to how the encoding/decoding works, spaciousness and definition will increase with each additional channel. There will be **no** effect on a single channel at all.
+**NOTE**: Due to how the encoding/decoding works, spaciousness and definition will increase with each additional channel. There will be **no effect on a single channel** at all.
 
 [More information](http://www.airwindows.com/console2)
 
@@ -80,6 +81,16 @@ Dual gain shifter
 Scales a signal up or down by increments of exactly 6 dB. If no input is connected, the respective output will provide constant voltage selectable in 1V steps from -8V to +8V. The lower section can be linked to the upper one to automatically compensate for values set by the upper 'Shift' knob. If linked the lower 'Shift' knob can be used to offset the signal in 6db steps (input connected) or 1V steps (input not connected). 
 
 [More information](http://www.airwindows.com/bitshiftgain)
+
+## Holt <a id="holt"></a>
+
+Resonant lowpass filter focussed on low frequencies
+
+![Rackwindows Hombre](res/images/holt_panels.jpg)
+
+Interestingly, Holt's algorithm is based on an Excel method for predicting sales figures based on trends. The result is a lowpass filter that's polite in the highs and increasingly mean towards the low-end. It also allows for seamless morphing between no poles (dry) and 4-poles (24db per octave). An additional output saturation stage helps keeping the possibly massive resonances in check (it can still get nasty though, you have been warned).
+
+[More information](http://www.airwindows.com/holt)
 
 ## Hombre <a id="hombre"></a>
 
@@ -151,7 +162,7 @@ Make sure to also play with the 'Inverse/Wet' knob for chorusing and flange effe
 
 ## A word on processing quality
 
-Some (eventually likely all) modules can be set to a lower quality mode in order to reduce CPU usage on weaker systems via context menu. The actual algorithms remain untouched, but simply run with reduced wordlength (float instead of double and long double). Also any noise shaping/dithering is skipped. This can result in speed improvements of roughly 10% to 50% depending on the module.
+Most modules feature an **Eco** mode in order to reduce CPU usage on weaker systems. The actual algorithms remain untouched, but any noise shaping/dithering is skipped. This can result in speed improvements of roughly 10% to 50% depending on the module.
 
 ## Building from Source
 
@@ -159,4 +170,4 @@ To compile the modules from source, see the official [VCV Rack documentation](ht
 
 ## Colophon
 
-The typeface used is [Barlow](https://github.com/jpt/barlow) by Jeremy Tribby
+The typeface used on the panels is [Barlow](https://github.com/jpt/barlow) by Jeremy Tribby.
