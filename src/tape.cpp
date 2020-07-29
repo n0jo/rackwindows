@@ -95,7 +95,7 @@ struct Tape : Module {
         configParam(BUMP_PARAM, 0.f, 1.f, 0.5f, "Bump");
 
         quality = loadQuality();
-        processDivider.setDivision(1024);
+        processDivider.setDivision(512);
         onReset();
     }
 
