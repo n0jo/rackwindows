@@ -2,8 +2,8 @@
 Console MM
 ----------
 VCV Rack module based on Console by Chris Johnson from Airwindows <www.airwindows.com>, but specifically designed
-to work in conjunction with MindMeld's MixMaster. It takes the polyphonic direct outs of MixMaster, encodes and sums
-the individual channels, then decodes and outputs the stereo sum.
+to work in conjunction with MindMeld's MixMaster module. It takes the polyphonic direct outs of MixMaster, encodes and sums
+the individual channels, then decodes and outputs a single stereo sum.
 
 Ported and designed by Jens Robert Janke
 
@@ -56,7 +56,7 @@ struct Console_mm : Module {
     Console_mm()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(LEVEL_PARAM, 0.f, 1.f, 0.5f, "Level", "%");
+        configParam(LEVEL_PARAM, 0.f, 1.f, 1.f, "Level", " dB", -10, 20.0f * 3);
 
         quality = loadQuality();
         consoleType = loadConsoleType();
@@ -204,7 +204,7 @@ struct Console_mm : Module {
             }
 
             // outpul level control
-            sum[i] *= params[LEVEL_PARAM].getValue() * 2;
+            sum[i] *= pow(params[LEVEL_PARAM].getValue(), 3);
 
             // outputs
             outputs[OUT_OUTPUTS + i].setVoltage(sum[i]);
