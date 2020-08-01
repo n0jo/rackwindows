@@ -65,6 +65,15 @@
       ]
     },
     {
+      "slug": "console_mm",
+      "name": "Console MM",
+      "description": "Stereo summing mixer to work in conjunction with MindMeld's MixMaster",
+      "tags": [
+        "Mixer",
+        "Utility"
+      ]
+    },
+    {
       "slug": "distance",
       "name": "Distance",
       "description": "Far-away-izer",
