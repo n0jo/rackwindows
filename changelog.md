@@ -1,4 +1,7 @@
 
+### 1.1.2 (01-08-2020)
+- New module: Console MM
+
 ### 1.1.1 (29-07-2020)
 - New module: Holt
 - ResEQ: Fixed parameter scaling and glitches
