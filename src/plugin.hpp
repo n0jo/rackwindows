@@ -44,6 +44,10 @@ struct highQualityDefaultItem : MenuItem {
 void saveConsoleType(int consoleType);
 int loadConsoleType();
 
+// direct output mode
+void saveDirectOutMode(int directOutMode);
+bool loadDirectOutMode();
+
 // themes
 static const std::string lightPanelID = "Light Panel";
 static const std::string darkPanelID = "Dark Panel";

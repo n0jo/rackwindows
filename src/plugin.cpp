@@ -149,6 +149,46 @@ int loadConsoleType()
     return ret;
 }
 
+// direct output mode
+void saveDirectOutMode(bool directOutMode)
+{
+    json_t* settingsJ = json_object();
+    json_object_set_new(settingsJ, "directOutMode", json_boolean(directOutMode));
+    std::string settingsFilename = asset::user("Rackwindows.json");
+    FILE* file = fopen(settingsFilename.c_str(), "w");
+    if (file) {
+        json_dumpf(settingsJ, file, JSON_INDENT(2) | JSON_REAL_PRECISION(9));
+        fclose(file);
+    }
+    json_decref(settingsJ);
+}
+
+bool loadDirectOutMode()
+{
+    bool ret = false;
+    std::string settingsFilename = asset::user("Rackwindows.json");
+    FILE* file = fopen(settingsFilename.c_str(), "r");
+    if (!file) {
+        saveDirectOutMode(false);
+        return ret;
+    }
+    json_error_t error;
+    json_t* settingsJ = json_loadf(file, 0, &error);
+    if (!settingsJ) {
+        // invalid setting json file
+        fclose(file);
+        saveDirectOutMode(false);
+        return ret;
+    }
+    json_t* directOutModeJ = json_object_get(settingsJ, "directOutMode");
+    if (directOutModeJ)
+        ret = json_boolean_value(directOutModeJ);
+
+    fclose(file);
+    json_decref(settingsJ);
+    return ret;
+}
+
 // https://github.com/MarcBoule/Geodesics/blob/master/src/Geodesics.cpp
 void saveDarkAsDefault(bool darkAsDefault)
 {

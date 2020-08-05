@@ -9,7 +9,9 @@ Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - encodes, sums and decodes the direct outs of MixMaster
+- additional direct outputs, unprocessed or summed
 - console types: Console6, PurestConsole
+- partly polyphonic
 
 Additional code inspired by the Fundamental Mixer by Andrew Belt.
 
@@ -32,7 +34,7 @@ struct Console_mm : Module {
         NUM_INPUTS
     };
     enum OutputIds {
-        ENUMS(THRU_OUTPUTS, 3),
+        ENUMS(DIRECT_OUTPUTS, 3),
         ENUMS(OUT_OUTPUTS, 2),
         OUT_L_OUTPUT,
         OUT_R_OUTPUT,
@@ -43,12 +45,16 @@ struct Console_mm : Module {
     };
 
     // module variables
-    const double gainCut = 0.03125;
-    const double gainBoost = 32.0;
+    const double gainFactor = 32;
     bool quality;
     int consoleType;
     dsp::VuMeter2 vuMeters[9];
     dsp::ClockDivider lightDivider;
+    enum directOutModes {
+        UNPROCESSED,
+        SUMMED
+    };
+    int directOutMode;
 
     // state variables (as arrays in order to handle up to 16 polyphonic channels)
     uint32_t fpd[16];
@@ -60,6 +66,7 @@ struct Console_mm : Module {
 
         quality = loadQuality();
         consoleType = loadConsoleType();
+        directOutMode = loadDirectOutMode();
         lightDivider.setDivision(512);
         onReset();
     }
@@ -78,6 +85,9 @@ struct Console_mm : Module {
         // quality
         json_object_set_new(rootJ, "quality", json_integer(quality));
 
+        // directOutMode
+        json_object_set_new(rootJ, "directOutMode", json_integer(directOutMode));
+
         // consoleType
         json_object_set_new(rootJ, "consoleType", json_integer(consoleType));
 
@@ -90,6 +100,11 @@ struct Console_mm : Module {
         json_t* qualityJ = json_object_get(rootJ, "quality");
         if (qualityJ)
             quality = json_integer_value(qualityJ);
+
+        // directOutMode
+        json_t* directOutModeJ = json_object_get(rootJ, "directOutMode");
+        if (directOutModeJ)
+            directOutMode = json_integer_value(directOutModeJ);
 
         // consoleType
         json_t* consoleTypeJ = json_object_get(rootJ, "consoleType");
@@ -141,13 +156,14 @@ struct Console_mm : Module {
 
     void process(const ProcessArgs& args) override
     {
-        long double sum[] = { 0.0, 0.0 };
+        long double directOutSum[] = { 0.0, 0.0, 0.0 };
+        long double stereoOutSum[] = { 0.0, 0.0 };
 
         // for each input
         for (int x = 0; x < 3; x++) {
 
             int numChannels = inputs[IN_INPUTS + x].getChannels();
-            outputs[THRU_OUTPUTS + x].setChannels(numChannels);
+            outputs[DIRECT_OUTPUTS + x].setChannels(numChannels);
 
             if (inputs[IN_INPUTS + x].isConnected()) {
 
@@ -157,14 +173,16 @@ struct Console_mm : Module {
                     // get input
                     long double inputSample = inputs[IN_INPUTS + x].getPolyVoltage(i);
 
-                    // first we send the input to the respective Thru output
-                    outputs[THRU_OUTPUTS + x].setVoltage(inputSample, i);
+                    if (directOutMode == UNPROCESSED) {
+                        // send the input directly to the respective output
+                        outputs[DIRECT_OUTPUTS + x].setVoltage(inputSample, i);
+                    }
 
                     // only process if there is a signal
                     if (inputSample) {
 
                         // pad gain, will be boosted before output
-                        inputSample *= gainCut;
+                        inputSample /= gainFactor;
 
                         if (quality == HIGH) {
                             if (fabs(inputSample) < 1.18e-37)
@@ -174,40 +192,72 @@ struct Console_mm : Module {
                         // encode
                         inputSample = encode(inputSample, consoleType);
 
-                        // add alternately to left or right sum
-                        sum[i % 2] += inputSample;
+                        // add alternately to the left or right channel of the stereo sum
+                        stereoOutSum[i % 2] += inputSample;
+
+                        if (directOutMode == SUMMED) {
+                            // add processed sample to respective output sum
+                            directOutSum[x] += inputSample;
+                        }
                     }
                 }
             }
         }
 
-        // for each output
+        if (directOutMode == SUMMED) {
+            // for each direct output in summing mode
+            for (int i = 0; i < 3; i++) {
+                if (outputs[DIRECT_OUTPUTS + i].isConnected()) {
+
+                    // decode
+                    directOutSum[i] = decode(directOutSum[i], consoleType);
+
+                    if (quality == HIGH) {
+                        // 32 bit floating point dither
+                        int expon;
+                        frexpf((float)directOutSum[i], &expon);
+                        fpd[i] ^= fpd[i] << 13;
+                        fpd[i] ^= fpd[i] >> 17;
+                        fpd[i] ^= fpd[i] << 5;
+                        directOutSum[i] += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
+                    }
+
+                    // bring gain back up
+                    directOutSum[i] *= gainFactor;
+                }
+
+                // outputs
+                outputs[DIRECT_OUTPUTS + i].setVoltage(directOutSum[i]);
+            }
+        }
+
+        // for each stereo channel
         for (int i = 0; i < 2; i++) {
 
             if (outputs[OUT_OUTPUTS + i].isConnected()) {
 
                 // decode
-                sum[i] = decode(sum[i], consoleType);
+                stereoOutSum[i] = decode(stereoOutSum[i], consoleType);
 
                 if (quality == HIGH) {
                     // 32 bit floating point dither
                     int expon;
-                    frexpf((float)sum[i], &expon);
+                    frexpf((float)stereoOutSum[i], &expon);
                     fpd[i] ^= fpd[i] << 13;
                     fpd[i] ^= fpd[i] >> 17;
                     fpd[i] ^= fpd[i] << 5;
-                    sum[i] += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
+                    stereoOutSum[i] += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
                 }
 
                 // bring gain back up
-                sum[i] *= gainBoost;
+                stereoOutSum[i] *= gainFactor;
             }
 
             // outpul level control
-            sum[i] *= pow(params[LEVEL_PARAM].getValue(), 3);
+            stereoOutSum[i] *= pow(params[LEVEL_PARAM].getValue(), 3);
 
             // outputs
-            outputs[OUT_OUTPUTS + i].setVoltage(sum[i]);
+            outputs[OUT_OUTPUTS + i].setVoltage(stereoOutSum[i]);
         }
     }
 };
@@ -246,6 +296,22 @@ struct Console_mmWidget : ModuleWidget {
         }
     };
 
+    // directoutMode item
+    struct DirectOutModeItem : MenuItem {
+        Console_mm* module;
+        int directOutMode;
+
+        void onAction(const event::Action& e) override
+        {
+            module->directOutMode = directOutMode;
+        }
+
+        void step() override
+        {
+            rightText = (module->directOutMode == directOutMode) ? "✔" : "";
+        }
+    };
+
     void appendContextMenu(Menu* menu) override
     {
         Console_mm* module = dynamic_cast<Console_mm*>(this->module);
@@ -272,7 +338,7 @@ struct Console_mmWidget : ModuleWidget {
         menu->addChild(new MenuSeparator()); // separator
 
         MenuLabel* consoleTypeLabel = new MenuLabel(); // menu label
-        consoleTypeLabel->text = "Type";
+        consoleTypeLabel->text = "Console Type";
         menu->addChild(consoleTypeLabel);
 
         ConsoleTypeItem* console6 = new ConsoleTypeItem(); // Console6
@@ -286,6 +352,24 @@ struct Console_mmWidget : ModuleWidget {
         purestConsole->module = module;
         purestConsole->consoleType = 1;
         menu->addChild(purestConsole);
+
+        menu->addChild(new MenuSeparator()); // separator
+
+        MenuLabel* directOutModeLabel = new MenuLabel(); // menu label
+        directOutModeLabel->text = "Direct Output Mode";
+        menu->addChild(directOutModeLabel);
+
+        DirectOutModeItem* unprocessed = new DirectOutModeItem(); // unprocessed
+        unprocessed->text = "Unprocessed";
+        unprocessed->module = module;
+        unprocessed->directOutMode = 0;
+        menu->addChild(unprocessed);
+
+        DirectOutModeItem* summed = new DirectOutModeItem(); // summed
+        summed->text = "Summed";
+        summed->module = module;
+        summed->directOutMode = 1;
+        menu->addChild(summed);
     }
 
     Console_mmWidget(Console_mm* module)
@@ -300,19 +384,19 @@ struct Console_mmWidget : ModuleWidget {
         addChild(createWidget<ScrewBlack>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         // params
-        addParam(createParamCentered<RwKnobLargeDark>(Vec(45.0, 260.0), module, Console_mm::LEVEL_PARAM));
+        addParam(createParamCentered<RwKnobLargeDark>(Vec(45.0, 310.0), module, Console_mm::LEVEL_PARAM));
 
         // inputs
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 55.0), module, Console_mm::IN_INPUTS + 0));
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 95.0), module, Console_mm::IN_INPUTS + 1));
-        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 135.0), module, Console_mm::IN_INPUTS + 2));
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 75.0), module, Console_mm::IN_INPUTS + 0));
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 115.0), module, Console_mm::IN_INPUTS + 1));
+        addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 155.0), module, Console_mm::IN_INPUTS + 2));
 
         // outputs
-        addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.695, 55.0), module, Console_mm::THRU_OUTPUTS + 0));
-        addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.695, 95.0), module, Console_mm::THRU_OUTPUTS + 1));
-        addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.75, 135.0), module, Console_mm::THRU_OUTPUTS + 2));
-        addOutput(createOutputCentered<RwPJ301MPort>(Vec(26.25, 325.0), module, Console_mm::OUT_OUTPUTS + 0));
-        addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.75, 325.0), module, Console_mm::OUT_OUTPUTS + 1));
+        addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.75, 75.0), module, Console_mm::DIRECT_OUTPUTS + 0));
+        addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.75, 115.0), module, Console_mm::DIRECT_OUTPUTS + 1));
+        addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.75, 155.0), module, Console_mm::DIRECT_OUTPUTS + 2));
+        addOutput(createOutputCentered<RwPJ301MPort>(Vec(26.25, 245.0), module, Console_mm::OUT_OUTPUTS + 0));
+        addOutput(createOutputCentered<RwPJ301MPort>(Vec(63.75, 245.0), module, Console_mm::OUT_OUTPUTS + 1));
     }
 };
 
