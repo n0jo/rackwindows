@@ -45,7 +45,7 @@ struct Console_mm : Module {
     };
 
     // module variables
-    const double gainFactor = 32;
+    const double gainFactor = 32.0;
     bool quality;
     int consoleType;
     dsp::VuMeter2 vuMeters[9];
