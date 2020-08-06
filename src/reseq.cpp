@@ -41,8 +41,7 @@ struct Reseq : Module {
     };
 
     // module variables
-    const double gainCut = 0.03125;
-    const double gainBoost = 32.0;
+    const double gainFactor = 32.0;
     int quality;
 
     // control parameters
@@ -135,27 +134,27 @@ struct Reseq : Module {
     {
         r1Param = params[RESO_PARAMS + 0].getValue();
         r1Param += inputs[RESO_CV_INPUTS + 0].getVoltage() / 5;
-        r1Param = clamp(r1Param, 0.01f, 0.99f);
+        r1Param = clamp(r1Param, 0.f, 1.f);
 
         r2Param = params[RESO_PARAMS + 1].getValue();
         r2Param += inputs[RESO_CV_INPUTS + 1].getVoltage() / 5;
-        r2Param = clamp(r2Param, 0.01f, 0.99f);
+        r2Param = clamp(r2Param, 0.f, 1.f);
 
         r3Param = params[RESO_PARAMS + 2].getValue();
         r3Param += inputs[RESO_CV_INPUTS + 2].getVoltage() / 5;
-        r3Param = clamp(r3Param, 0.01f, 0.99f);
+        r3Param = clamp(r3Param, 0.f, 1.f);
 
         r4Param = params[RESO_PARAMS + 3].getValue();
         r4Param += inputs[RESO_CV_INPUTS + 3].getVoltage() / 5;
-        r4Param = clamp(r4Param, 0.01f, 0.99f);
+        r4Param = clamp(r4Param, 0.f, 1.f);
 
         drywetParam = params[DRYWET_PARAM].getValue();
         drywetParam += inputs[DRYWET_CV_INPUT].getVoltage() / 5;
-        drywetParam = clamp(drywetParam, 0.01f, 0.99f);
+        drywetParam = clamp(drywetParam, 0.f, 1.f);
 
         wet = drywetParam;
 
-        if (r1Param > 0.01f) {
+        if (r1Param) {
             v1 = r1Param;
             f1 = pow(v1, 2);
             v1 += 0.2;
@@ -165,7 +164,7 @@ struct Reseq : Module {
             isActiveR1 = false;
         }
 
-        if (r2Param > 0.01f) {
+        if (r2Param) {
             v2 = r2Param;
             f2 = pow(v2, 2);
             v2 += 0.2;
@@ -175,7 +174,7 @@ struct Reseq : Module {
             isActiveR2 = false;
         }
 
-        if (r3Param > 0.01f) {
+        if (r3Param) {
             v3 = r3Param;
             f3 = pow(v3, 2);
             v3 += 0.2;
@@ -185,7 +184,7 @@ struct Reseq : Module {
             isActiveR3 = false;
         }
 
-        if (r4Param > 0.01f) {
+        if (r4Param) {
             v4 = r4Param;
             f4 = pow(v4, 2);
             v4 += 0.2;
@@ -208,7 +207,7 @@ struct Reseq : Module {
             long double inputSample = input.getPolyVoltage(i);
 
             // pad gain
-            inputSample *= gainCut;
+            inputSample /= gainFactor;
 
             // each process frame we'll update some of the kernel frames. That way we don't have to crunch the whole thing at once,
             // and we can load a LOT more resonant peaks into the kernel.
@@ -394,7 +393,7 @@ struct Reseq : Module {
             }
 
             // bring gain back up
-            inputSample *= gainBoost;
+            inputSample *= gainFactor;
 
             // output
             outputs[OUT_OUTPUT].setChannels(numChannels);
