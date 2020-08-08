@@ -19,6 +19,7 @@ extern Model* modelDistance;
 extern Model* modelHolt;
 extern Model* modelHombre;
 extern Model* modelInterstage;
+extern Model* modelMonitoring;
 extern Model* modelMv;
 extern Model* modelReseq;
 extern Model* modelTape;

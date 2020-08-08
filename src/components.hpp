@@ -90,6 +90,22 @@ struct RwSwitchKnobMediumDark : RwKnobMediumDark {
         snap = true;
     }
 };
+struct RwSwitchKnobMediumDarkOneThird : RwKnobMediumDark {
+    RwSwitchKnobMediumDarkOneThird()
+    {
+        minAngle = -0.33 * M_PI;
+        maxAngle = 0.33 * M_PI;
+        snap = true;
+    }
+};
+struct RwSwitchKnobMediumDarkTwoThirds : RwKnobMediumDark {
+    RwSwitchKnobMediumDarkTwoThirds()
+    {
+        minAngle = -0.74 * M_PI;
+        maxAngle = 0.74 * M_PI;
+        snap = true;
+    }
+};
 struct RwSwitchKnobSmall : RwKnobSmall {
     RwSwitchKnobSmall()
     {

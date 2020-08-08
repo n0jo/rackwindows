@@ -17,6 +17,7 @@ void init(Plugin* p)
     p->addModel(modelHolt);
     p->addModel(modelHombre);
     p->addModel(modelInterstage);
+    p->addModel(modelMonitoring);
     p->addModel(modelMv);
     p->addModel(modelReseq);
     p->addModel(modelTape);

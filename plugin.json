@@ -112,6 +112,14 @@
       ]
     },
     {
+      "slug": "monitoring",
+      "name": "Monitoring",
+      "description": "Mixchecker",
+      "tags": [
+        "Utility"
+      ]
+    },
+    {
       "slug": "mv",
       "name": "MV",
       "description": "Dual-mono reverb",
