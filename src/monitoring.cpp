@@ -7,7 +7,7 @@ Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - separate controls for processing modes and cans
-- no monolat, monorat
+- no monolat, monorat, phone
 
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
@@ -65,13 +65,17 @@ struct Monitoring : Module {
         CANS_C,
         CANS_D
     };
-    bool isDither16;
+    enum ditherModes {
+        DITHER_OFF,
+        DITHER_24,
+        DITHER_16
+    };
 
     // control parameters
-    int mode;
+    int processingMode;
+    int lastProcessingMode;
     int cansMode;
-    int lastMode;
-    int lastCansMode;
+    int ditherMode;
 
     // state variables
     SubsOnly subsL, subsR;
@@ -88,9 +92,9 @@ struct Monitoring : Module {
     Monitoring()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(MODE_PARAM, 0.f, 8.f, 0.f, "Mode");
+        configParam(MODE_PARAM, 0.f, 7.f, 0.f, "Mode");
         configParam(CANS_PARAM, 0.f, 4.f, 0.f, "Cans");
-        configParam(DITHER_PARAM, 0.f, 1.f, 0.f, "Dither");
+        configParam(DITHER_PARAM, 0.f, 2.f, 0.f, "Dither");
 
         quality = loadQuality();
         onReset();
@@ -112,12 +116,11 @@ struct Monitoring : Module {
         darkL = Dark();
         darkR = Dark();
 
-        mode = 0;
+        processingMode = 0;
         cansMode = 0;
-        lastMode = 0;
-        lastCansMode = 0;
+        lastProcessingMode = 0;
+        ditherMode = 0;
 
-        isDither16 = false;
         fpd = 17;
     }
 
@@ -151,31 +154,31 @@ struct Monitoring : Module {
     void process(const ProcessArgs& args) override
     {
         // dither light
-        isDither16 = params[DITHER_PARAM].getValue() ? true : false;
-        lights[DITHER_24_LIGHT].setBrightness(!isDither16);
-        lights[DITHER_16_LIGHT].setBrightness(isDither16);
+        ditherMode = params[DITHER_PARAM].getValue();
+        lights[DITHER_24_LIGHT].setBrightness(ditherMode == DITHER_24 ? 1.f : 0.f);
+        lights[DITHER_16_LIGHT].setBrightness(ditherMode == DITHER_16 ? 1.f : 0.f);
 
         if (outputs[OUT_L_OUTPUT].isConnected() || outputs[OUT_R_OUTPUT].isConnected()) {
 
             // get params
-            mode = params[MODE_PARAM].getValue();
+            processingMode = params[MODE_PARAM].getValue();
             cansMode = params[CANS_PARAM].getValue();
 
-            if (mode != lastMode) {
+            if (processingMode != lastProcessingMode) {
                 // set up bandpass for vinyl, aurat and phone
-                if (mode == VINYL) {
+                if (processingMode == VINYL) {
                     bandpassL.set(0.0385 / overallscale, 0.0825);
                     bandpassR.set(0.0385 / overallscale, 0.0825);
                 }
-                if (mode == AURAT) {
+                if (processingMode == AURAT) {
                     bandpassL.set(0.0375 / overallscale, 0.1575);
                     bandpassR.set(0.0375 / overallscale, 0.1575);
                 }
-                if (mode == PHONE) {
+                if (processingMode == PHONE) {
                     bandpassL.set(0.1245 / overallscale, 0.46);
                     bandpassR.set(0.1245 / overallscale, 0.46);
                 }
-                lastMode = mode;
+                lastProcessingMode = processingMode;
             }
 
             // get input
@@ -198,8 +201,7 @@ struct Monitoring : Module {
             }
 
             // processing modes
-            switch (mode) {
-
+            switch (processingMode) {
             case OFF:
                 break;
 
@@ -251,8 +253,33 @@ struct Monitoring : Module {
             }
 
             // dither
-            inputSampleL = darkL.process(inputSampleL, args.sampleRate, !isDither16);
-            inputSampleR = darkR.process(inputSampleR, args.sampleRate, !isDither16);
+            switch (ditherMode) {
+            case DITHER_OFF:
+                break;
+            case DITHER_16:
+                inputSampleL = darkL.process(inputSampleL, args.sampleRate, false);
+                inputSampleR = darkR.process(inputSampleR, args.sampleRate, false);
+                break;
+            case DITHER_24:
+                inputSampleL = darkL.process(inputSampleL, args.sampleRate, true);
+                inputSampleR = darkR.process(inputSampleR, args.sampleRate, true);
+                break;
+            }
+
+            if (quality == HIGH) {
+                // 32 bit stereo floating point dither
+                int expon;
+                frexpf((float)inputSampleL, &expon);
+                fpd ^= fpd << 13;
+                fpd ^= fpd >> 17;
+                fpd ^= fpd << 5;
+                inputSampleL += ((double(fpd) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
+                frexpf((float)inputSampleR, &expon);
+                fpd ^= fpd << 13;
+                fpd ^= fpd >> 17;
+                fpd ^= fpd << 5;
+                inputSampleR += ((double(fpd) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
+            }
 
             // bring gain back up
             inputSampleL *= gainFactor;
@@ -266,6 +293,47 @@ struct Monitoring : Module {
 };
 
 struct MonitoringWidget : ModuleWidget {
+
+    // quality item
+    struct QualityItem : MenuItem {
+        Monitoring* module;
+        int quality;
+
+        void onAction(const event::Action& e) override
+        {
+            module->quality = quality;
+        }
+
+        void step() override
+        {
+            rightText = (module->quality == quality) ? "✔" : "";
+        }
+    };
+
+    void appendContextMenu(Menu* menu) override
+    {
+        Monitoring* module = dynamic_cast<Monitoring*>(this->module);
+        assert(module);
+
+        menu->addChild(new MenuSeparator()); // separator
+
+        MenuLabel* qualityLabel = new MenuLabel(); // menu label
+        qualityLabel->text = "Quality";
+        menu->addChild(qualityLabel);
+
+        QualityItem* low = new QualityItem(); // low quality
+        low->text = "Eco";
+        low->module = module;
+        low->quality = 0;
+        menu->addChild(low);
+
+        QualityItem* high = new QualityItem(); // high quality
+        high->text = "High";
+        high->module = module;
+        high->quality = 1;
+        menu->addChild(high);
+    }
+
     MonitoringWidget(Monitoring* module)
     {
         setModule(module);
@@ -282,11 +350,11 @@ struct MonitoringWidget : ModuleWidget {
         addParam(createParamCentered<RwSwitchKnobMediumDarkOneThird>(Vec(52.5, 165.0), module, Monitoring::CANS_PARAM));
 
         // switch
-        addParam(createParamCentered<RwCKSSRot>(Vec(52.5, 230.0), module, Monitoring::DITHER_PARAM));
+        addParam(createParamCentered<RwSwitchThree>(Vec(52.5, 235.0), module, Monitoring::DITHER_PARAM));
 
         // lights
-        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(22.5, 230.0), module, Monitoring::DITHER_24_LIGHT));
-        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(82.5, 230.0), module, Monitoring::DITHER_16_LIGHT));
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(18.8, 235.0), module, Monitoring::DITHER_24_LIGHT));
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(86.3, 235.0), module, Monitoring::DITHER_16_LIGHT));
 
         // inputs
         addInput(createInputCentered<RwPJ301MPortSilver>(Vec(33.75, 285.0), module, Monitoring::IN_L_INPUT));
