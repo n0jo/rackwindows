@@ -112,12 +112,8 @@ struct Cans {
         return this->mode;
     }
 
-    void process(float sampleRate, long double& inputSampleL, long double& inputSampleR)
+    void process(long double& inputSampleL, long double& inputSampleR, double overallscale = 1.0)
     {
-        double overallscale = 1.0;
-        overallscale /= 44100.0;
-        overallscale *= sampleRate;
-
         int am = (int)149.0 * overallscale;
         int dm = (int)223.0 * overallscale;
         int allpasstemp;
@@ -274,12 +270,8 @@ struct Dark {
         }
     }
 
-    long double process(long double inputSample, float sampleRate, bool highres = true)
+    long double process(long double inputSample, double overallscale = 1.0, bool highres = true)
     {
-        double overallscale = 1.0;
-        overallscale /= 44100.0;
-        overallscale *= sampleRate;
-
         int depth = (int)(17.0 * overallscale);
         if (depth < 3)
             depth = 3;
@@ -291,11 +283,6 @@ struct Dark {
             scaleFactor = 8388608.0;
         else
             scaleFactor = 32768.0;
-        // float derez = derezParam;
-        // if (derez > 0.0)
-        //     scaleFactor *= pow(1.0 - derez, 6);
-        // if (scaleFactor < 0.0001)
-        //     scaleFactor = 0.0001;
         float outScale = scaleFactor;
         if (outScale < 8.0)
             outScale = 8.0;
@@ -365,12 +352,8 @@ struct PeaksOnly {
         dx = 1;
     }
 
-    long double process(long double inputSample, float sampleRate)
+    long double process(long double inputSample, double overallscale = 1.0)
     {
-        double overallscale = 1.0;
-        overallscale /= 44100.0;
-        overallscale *= sampleRate;
-
         int am = (int)149.0 * overallscale;
         int bm = (int)179.0 * overallscale;
         int cm = (int)191.0 * overallscale;
@@ -568,12 +551,8 @@ struct SubsOnly {
         iirSampleZ = 0.0;
     }
 
-    long double process(long double inputSample, float sampleRate)
+    long double process(long double inputSample, double overallscale = 1.0)
     {
-        double overallscale = 1.0;
-        overallscale /= 44100.0;
-        overallscale *= sampleRate;
-
         double iirAmount = 2250 / 44100.0;
         double gaintarget = 1.42;
         double gain;

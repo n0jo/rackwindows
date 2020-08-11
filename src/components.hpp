@@ -102,7 +102,7 @@ struct RwSwitchKnobMediumDarkTwoThirds : RwKnobMediumDark {
     RwSwitchKnobMediumDarkTwoThirds()
     {
         minAngle = -0.74 * M_PI;
-        maxAngle = 0.555 * M_PI;
+        maxAngle = 0.74 * M_PI;
         snap = true;
     }
 };

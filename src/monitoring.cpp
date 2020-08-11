@@ -7,7 +7,7 @@ Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - separate controls for processing modes and cans
-- no monolat, monorat, phone
+- no monolat, monorat
 
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
@@ -41,12 +41,7 @@ struct Monitoring : Module {
     };
 
     // module variables
-    const double gainFactor = 32.0;
-    int quality;
-    enum qualityOptions {
-        ECO,
-        HIGH
-    };
+    const double gainFactor = 10.0;
     enum processingModes {
         OFF,
         SUBS,
@@ -92,11 +87,10 @@ struct Monitoring : Module {
     Monitoring()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(MODE_PARAM, 0.f, 7.f, 0.f, "Mode");
+        configParam(MODE_PARAM, 0.f, 8.f, 0.f, "Mode");
         configParam(CANS_PARAM, 0.f, 4.f, 0.f, "Cans");
         configParam(DITHER_PARAM, 0.f, 2.f, 0.f, "Dither");
 
-        quality = loadQuality();
         onReset();
     }
 
@@ -131,24 +125,6 @@ struct Monitoring : Module {
         overallscale = 1.0;
         overallscale /= 44100.0;
         overallscale *= sampleRate;
-    }
-
-    json_t* dataToJson() override
-    {
-        json_t* rootJ = json_object();
-
-        // quality
-        json_object_set_new(rootJ, "quality", json_integer(quality));
-
-        return rootJ;
-    }
-
-    void dataFromJson(json_t* rootJ) override
-    {
-        // quality
-        json_t* qualityJ = json_object_get(rootJ, "quality");
-        if (qualityJ)
-            quality = json_integer_value(qualityJ);
     }
 
     void process(const ProcessArgs& args) override
@@ -193,21 +169,14 @@ struct Monitoring : Module {
             long double mid = inputSampleL + inputSampleR;
             long double side = inputSampleL - inputSampleR;
 
-            if (quality == HIGH) {
-                if (fabs(inputSampleL) < 1.18e-37)
-                    inputSampleL = fpd * 1.18e-37;
-                if (fabs(inputSampleR) < 1.18e-37)
-                    inputSampleR = fpd * 1.18e-37;
-            }
-
             // processing modes
             switch (processingMode) {
             case OFF:
                 break;
 
             case SUBS:
-                inputSampleL = subsL.process(inputSampleL, args.sampleRate);
-                inputSampleR = subsR.process(inputSampleR, args.sampleRate);
+                inputSampleL = subsL.process(inputSampleL, overallscale);
+                inputSampleR = subsR.process(inputSampleR, overallscale);
                 break;
 
             case SLEW:
@@ -216,8 +185,8 @@ struct Monitoring : Module {
                 break;
 
             case PEAKS:
-                inputSampleL = peaksL.process(inputSampleL, args.sampleRate);
-                inputSampleR = peaksR.process(inputSampleR, args.sampleRate);
+                inputSampleL = peaksL.process(inputSampleL, overallscale);
+                inputSampleR = peaksR.process(inputSampleR, overallscale);
                 break;
 
             case MID:
@@ -249,7 +218,7 @@ struct Monitoring : Module {
             // cans
             if (cansMode) {
                 cans.setMode(cansMode);
-                cans.process(args.sampleRate, inputSampleL, inputSampleR);
+                cans.process(inputSampleL, inputSampleR, overallscale);
             }
 
             // dither
@@ -257,28 +226,13 @@ struct Monitoring : Module {
             case DITHER_OFF:
                 break;
             case DITHER_16:
-                inputSampleL = darkL.process(inputSampleL, args.sampleRate, false);
-                inputSampleR = darkR.process(inputSampleR, args.sampleRate, false);
+                inputSampleL = darkL.process(inputSampleL, overallscale, false);
+                inputSampleR = darkR.process(inputSampleR, overallscale, false);
                 break;
             case DITHER_24:
-                inputSampleL = darkL.process(inputSampleL, args.sampleRate, true);
-                inputSampleR = darkR.process(inputSampleR, args.sampleRate, true);
+                inputSampleL = darkL.process(inputSampleL, overallscale, true);
+                inputSampleR = darkR.process(inputSampleR, overallscale, true);
                 break;
-            }
-
-            if (quality == HIGH) {
-                // 32 bit stereo floating point dither
-                int expon;
-                frexpf((float)inputSampleL, &expon);
-                fpd ^= fpd << 13;
-                fpd ^= fpd >> 17;
-                fpd ^= fpd << 5;
-                inputSampleL += ((double(fpd) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
-                frexpf((float)inputSampleR, &expon);
-                fpd ^= fpd << 13;
-                fpd ^= fpd >> 17;
-                fpd ^= fpd << 5;
-                inputSampleR += ((double(fpd) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
             }
 
             // bring gain back up
@@ -293,46 +247,6 @@ struct Monitoring : Module {
 };
 
 struct MonitoringWidget : ModuleWidget {
-
-    // quality item
-    struct QualityItem : MenuItem {
-        Monitoring* module;
-        int quality;
-
-        void onAction(const event::Action& e) override
-        {
-            module->quality = quality;
-        }
-
-        void step() override
-        {
-            rightText = (module->quality == quality) ? "✔" : "";
-        }
-    };
-
-    void appendContextMenu(Menu* menu) override
-    {
-        Monitoring* module = dynamic_cast<Monitoring*>(this->module);
-        assert(module);
-
-        menu->addChild(new MenuSeparator()); // separator
-
-        MenuLabel* qualityLabel = new MenuLabel(); // menu label
-        qualityLabel->text = "Quality";
-        menu->addChild(qualityLabel);
-
-        QualityItem* low = new QualityItem(); // low quality
-        low->text = "Eco";
-        low->module = module;
-        low->quality = 0;
-        menu->addChild(low);
-
-        QualityItem* high = new QualityItem(); // high quality
-        high->text = "High";
-        high->module = module;
-        high->quality = 1;
-        menu->addChild(high);
-    }
 
     MonitoringWidget(Monitoring* module)
     {
