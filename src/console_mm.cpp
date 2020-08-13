@@ -18,6 +18,7 @@ Additional code inspired by the Fundamental Mixer by Andrew Belt.
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
+#include "../../dsp/utility.h"
 #include "plugin.hpp"
 
 // quality options
@@ -45,11 +46,16 @@ struct Console_mm : Module {
     };
 
     // module variables
-    const double gainFactor = 32.0;
+    const double gainCut = 0.05;
+    const double gainBoost = 20.0;
     bool quality;
     int consoleType;
     dsp::VuMeter2 vuMeters[9];
     dsp::ClockDivider lightDivider;
+    enum consoleTypes {
+        CONSOLE_6,
+        PUREST_CONSOLE
+    };
     enum directOutModes {
         UNPROCESSED,
         SUMMED
@@ -62,7 +68,8 @@ struct Console_mm : Module {
     Console_mm()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(LEVEL_PARAM, 0.f, 1.f, 1.f, "Level", " dB", -10, 20.0f * 3);
+        // configParam(LEVEL_PARAM, 0.f, 1.f, 1.f, "Level", " dB", -10, 20.0f * 3);
+        configParam(LEVEL_PARAM, -1.f, 1.f, 0.f, "Drive", " dB", 0.f, 6.f);
 
         quality = loadQuality();
         consoleType = loadConsoleType();
@@ -115,7 +122,10 @@ struct Console_mm : Module {
     long double encode(long double inputSample, int consoleType = 0)
     {
         switch (consoleType) {
-        case 0: // Console6Channel
+        case PUREST_CONSOLE: // PurestConsoleChannel
+            inputSample = sin(inputSample);
+            break;
+        case CONSOLE_6: // Console6Channel
             if (inputSample > 1.0)
                 inputSample = 1.0;
             else if (inputSample > 0.0)
@@ -126,9 +136,6 @@ struct Console_mm : Module {
             else if (inputSample < 0.0)
                 inputSample = -1.0 + pow(1.0 + inputSample, 2.0);
             break;
-        case 1: // PurestConsoleChannel
-            inputSample = sin(inputSample);
-            break;
         }
         return inputSample;
     }
@@ -136,7 +143,16 @@ struct Console_mm : Module {
     long double decode(long double inputSample, int consoleType = 0)
     {
         switch (consoleType) {
-        case 0: // Console6Buss
+        case PUREST_CONSOLE: // PurestConsoleBuss
+            //without this, you can get a NaN condition where it spits out DC offset at full blast!
+            if (inputSample > 1.0)
+                inputSample = 1.0;
+            if (inputSample < -1.0)
+                inputSample = -1.0;
+
+            inputSample = asin(inputSample);
+            break;
+        case CONSOLE_6: // Console6Buss
             if (inputSample > 1.0)
                 inputSample = 1.0;
             else if (inputSample > 0.0)
@@ -146,9 +162,6 @@ struct Console_mm : Module {
                 inputSample = -1.0;
             else if (inputSample < 0.0)
                 inputSample = -1.0 + pow(1.0 + inputSample, 0.5);
-            break;
-        case 1: // PurestConsoleBuss
-            inputSample = sin(inputSample);
             break;
         }
         return inputSample;
@@ -182,7 +195,13 @@ struct Console_mm : Module {
                     if (inputSample) {
 
                         // pad gain, will be boosted before output
-                        inputSample /= gainFactor;
+                        if (params[LEVEL_PARAM].getValue() > 0.0) {
+                            inputSample *= gainCut * (params[LEVEL_PARAM].getValue() + 1);
+                        } else if (params[LEVEL_PARAM].getValue() < 0.0) {
+                            inputSample *= gainCut / (params[LEVEL_PARAM].getValue() - 1);
+                        } else {
+                            inputSample *= gainCut;
+                        }
 
                         if (quality == HIGH) {
                             if (fabs(inputSample) < 1.18e-37)
@@ -223,7 +242,7 @@ struct Console_mm : Module {
                     }
 
                     // bring gain back up
-                    directOutSum[i] *= gainFactor;
+                    directOutSum[i] *= gainBoost * 0.5; // + rough compensation for summing
                 }
 
                 // outputs
@@ -250,11 +269,17 @@ struct Console_mm : Module {
                 }
 
                 // bring gain back up
-                stereoOutSum[i] *= gainFactor;
+                if (params[LEVEL_PARAM].getValue() > 0.0) {
+                    stereoOutSum[i] *= gainBoost / (params[LEVEL_PARAM].getValue() + 1);
+                } else if (params[LEVEL_PARAM].getValue() < 0.0) {
+                    stereoOutSum[i] *= gainBoost * (params[LEVEL_PARAM].getValue() - 1);
+                } else {
+                    stereoOutSum[i] *= gainBoost;
+                }
             }
 
             // outpul level control
-            stereoOutSum[i] *= pow(params[LEVEL_PARAM].getValue(), 3);
+            // stereoOutSum[i] *= pow(params[LEVEL_PARAM].getValue(), 3);
 
             // outputs
             outputs[OUT_OUTPUTS + i].setVoltage(stereoOutSum[i]);
