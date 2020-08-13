@@ -18,7 +18,6 @@ Additional code inspired by the Fundamental Mixer by Andrew Belt.
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
-#include "../../dsp/utility.h"
 #include "plugin.hpp"
 
 // quality options
