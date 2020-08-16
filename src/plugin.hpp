@@ -9,6 +9,7 @@ using namespace rack;
 extern Plugin* pluginInstance;
 
 // Declare each Model, defined in each module source file
+extern Model* modelAcceleration;
 extern Model* modelBitshiftgain;
 extern Model* modelCapacitor;
 extern Model* modelCapacitor_stereo;
@@ -21,14 +22,16 @@ extern Model* modelHombre;
 extern Model* modelInterstage;
 extern Model* modelMonitoring;
 extern Model* modelMv;
+extern Model* modelRasp;
 extern Model* modelReseq;
 extern Model* modelTape;
 extern Model* modelTremolo;
 extern Model* modelVibrato;
 
-/* other stuff */
+/* Other stuff */
 
-// sound quality settings
+/* #quality mode
+======================================================================================== */
 void saveQuality(bool quality);
 bool loadQuality();
 void saveHighQualityAsDefault(bool highQualityAsDefault);
@@ -41,15 +44,23 @@ struct highQualityDefaultItem : MenuItem {
     }
 };
 
-// console types
+/* #console type
+======================================================================================== */
 void saveConsoleType(int consoleType);
 int loadConsoleType();
 
-// direct output mode
+/* #direct out mode
+======================================================================================== */
 void saveDirectOutMode(int directOutMode);
 bool loadDirectOutMode();
 
-// themes
+/* #slew type
+======================================================================================== */
+void saveSlewType(int slewType);
+int loadSlewType();
+
+/* #themes
+======================================================================================== */
 static const std::string lightPanelID = "Light Panel";
 static const std::string darkPanelID = "Dark Panel";
 

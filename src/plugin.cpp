@@ -7,6 +7,7 @@ void init(Plugin* p)
     pluginInstance = p;
 
     // Add modules here
+    p->addModel(modelAcceleration);
     p->addModel(modelBitshiftgain);
     p->addModel(modelCapacitor);
     p->addModel(modelCapacitor_stereo);
@@ -19,6 +20,7 @@ void init(Plugin* p)
     p->addModel(modelInterstage);
     p->addModel(modelMonitoring);
     p->addModel(modelMv);
+    p->addModel(modelRasp);
     p->addModel(modelReseq);
     p->addModel(modelTape);
     p->addModel(modelTremolo);
@@ -30,7 +32,8 @@ void init(Plugin* p)
 
 /* Other stuff */
 
-// processing quality
+/* #quality mode
+======================================================================================== */
 void saveQuality(bool quality)
 {
     json_t* settingsJ = json_object();
@@ -110,7 +113,8 @@ bool loadHighQualityAsDefault()
     return ret;
 }
 
-// console type
+/* #console type
+======================================================================================== */
 void saveConsoleType(int consoleType)
 {
     json_t* settingsJ = json_object();
@@ -150,7 +154,49 @@ int loadConsoleType()
     return ret;
 }
 
-// direct output mode
+/* #slew type
+======================================================================================== */
+void saveSlewType(int slewType)
+{
+    json_t* settingsJ = json_object();
+    json_object_set_new(settingsJ, "slewType", json_boolean(slewType));
+    std::string settingsFilename = asset::user("Rackwindows.json");
+    FILE* file = fopen(settingsFilename.c_str(), "w");
+    if (file) {
+        json_dumpf(settingsJ, file, JSON_INDENT(2) | JSON_REAL_PRECISION(9));
+        fclose(file);
+    }
+    json_decref(settingsJ);
+}
+
+int loadSlewType()
+{
+    bool ret = false;
+    std::string settingsFilename = asset::user("Rackwindows.json");
+    FILE* file = fopen(settingsFilename.c_str(), "r");
+    if (!file) {
+        saveSlewType(false);
+        return ret;
+    }
+    json_error_t error;
+    json_t* settingsJ = json_loadf(file, 0, &error);
+    if (!settingsJ) {
+        // invalid setting json file
+        fclose(file);
+        saveSlewType(false);
+        return ret;
+    }
+    json_t* slewTypeJ = json_object_get(settingsJ, "slewType");
+    if (slewTypeJ)
+        ret = json_boolean_value(slewTypeJ);
+
+    fclose(file);
+    json_decref(settingsJ);
+    return ret;
+}
+
+/* #direct output mode
+======================================================================================== */
 void saveDirectOutMode(bool directOutMode)
 {
     json_t* settingsJ = json_object();
@@ -190,6 +236,8 @@ bool loadDirectOutMode()
     return ret;
 }
 
+/* #themes
+======================================================================================== */
 // https://github.com/MarcBoule/Geodesics/blob/master/src/Geodesics.cpp
 void saveDarkAsDefault(bool darkAsDefault)
 {

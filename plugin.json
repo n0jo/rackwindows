@@ -13,6 +13,14 @@
   "donateUrl": "",
   "changelogUrl": "https://github.com/n0jo/rackwindows/blob/master/changelog.md",
   "modules": [{
+      "slug": "acceleration",
+      "name": "Acceleration",
+      "description": "Acceleration limiter. Tames edges, leaves brightness.",
+      "tags": [
+        "Limiter"
+      ]
+    },
+    {
       "slug": "bitshiftgain",
       "name": "Dual BSG",
       "description": "Dual gain shifter",
@@ -127,6 +135,12 @@
         "Effect",
         "Reverb"
       ]
+    },
+    {
+      "slug": "rasp",
+      "name": "Rasp",
+      "description": "",
+      "tags": []
     },
     {
       "slug": "reseq",
