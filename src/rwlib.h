@@ -1,7 +1,501 @@
 #ifndef RWLIB_H
 #define RWLIB_H
 
+#include "math.h"
+
 namespace rwlib {
+
+/* #functions
+======================================================================================== */
+
+//this denormalization routine produces a white noise at -300 dB which the noise
+//shaping will interact with to produce a bipolar output, but the noise is actually
+//all positive. That should stop any variables from going denormal, and the routine
+//only kicks in if digital black is input. As a final touch, if you save to 24-bit
+//the silence will return to being digital black again.
+inline long double denormalize(long double inputSample)
+{
+    if (inputSample < 1.2e-38 && -inputSample < 1.2e-38) {
+        static int noisesource = 0;
+        //this declares a variable before anything else is compiled. It won't keep assigning
+        //it to 0 for every sample, it's as if the declaration doesn't exist in this context,
+        //but it lets me add this denormalization fix in a single place rather than updating
+        //it in three different locations. The variable isn't thread-safe but this is only
+        //a random seed and we can share it with whatever.
+        noisesource = noisesource % 1700021;
+        noisesource++;
+        int residue = noisesource * noisesource;
+        residue = residue % 170003;
+        residue *= residue;
+        residue = residue % 17011;
+        residue *= residue;
+        residue = residue % 1709;
+        residue *= residue;
+        residue = residue % 173;
+        residue *= residue;
+        residue = residue % 17;
+        double applyresidue = residue;
+        applyresidue *= 0.00000001;
+        applyresidue *= 0.00000001;
+        inputSample = applyresidue;
+    }
+    return inputSample;
+}
+
+/* #acceleration
+======================================================================================== */
+struct Acceleration {
+
+    double ataLastOut;
+    double s1;
+    double s2;
+    double s3;
+    double o1;
+    double o2;
+    double o3;
+    double m1;
+    double m2;
+    double des;
+
+    Acceleration()
+    {
+        ataLastOut = 0.0;
+        s1 = s2 = s3 = 0.0;
+        o1 = o2 = o3 = 0.0;
+        m1 = m2 = des = 0.0;
+    }
+
+    long double process(long double inputSample, float limitParam = 0.f, float drywetParam = 1.f, double overallscale = 1.0)
+    {
+        double intensity = pow(limitParam, 3) * (32 / overallscale);
+        double wet = drywetParam;
+        double dry = 1.0 - wet;
+
+        double sense;
+        double smooth;
+        double accumulatorSample;
+
+        double drySample = inputSample;
+
+        s3 = s2;
+        s2 = s1;
+        s1 = inputSample;
+        smooth = (s3 + s2 + s1) / 3.0;
+        m1 = (s1 - s2) * ((s1 - s2) / 1.3);
+        m2 = (s2 - s3) * ((s1 - s2) / 1.3);
+        sense = fabs(m1 - m2);
+        sense = (intensity * intensity * sense);
+        o3 = o2;
+        o2 = o1;
+        o1 = sense;
+        if (o2 > sense)
+            sense = o2;
+        if (o3 > sense)
+            sense = o3;
+        //sense on the most intense
+
+        if (sense > 1.0)
+            sense = 1.0;
+
+        inputSample *= (1.0 - sense);
+
+        inputSample += (smooth * sense);
+
+        sense /= 2.0;
+
+        accumulatorSample = (ataLastOut * sense) + (inputSample * (1.0 - sense));
+        ataLastOut = inputSample;
+        inputSample = accumulatorSample;
+
+        if (wet != 1.0) {
+            inputSample = (inputSample * wet) + (drySample * dry);
+        }
+
+        return inputSample;
+    }
+}; /* end Acceleration */
+
+/* #atmochannel
+======================================================================================== */
+struct AtmosphereChannel {
+
+    long double lastSampleA;
+    long double lastSampleB;
+    long double lastSampleC;
+    long double lastSampleD;
+    long double lastSampleE;
+    long double lastSampleF;
+    long double lastSampleG;
+    long double lastSampleH;
+    long double lastSampleI;
+    long double lastSampleJ;
+    long double lastSampleK;
+    long double lastSampleL;
+    long double lastSampleM;
+
+    long double thresholdA;
+    long double thresholdB;
+    long double thresholdC;
+    long double thresholdD;
+    long double thresholdE;
+    long double thresholdF;
+    long double thresholdG;
+    long double thresholdH;
+    long double thresholdI;
+    long double thresholdJ;
+    long double thresholdK;
+    long double thresholdL;
+    long double thresholdM;
+
+    AtmosphereChannel()
+    {
+        lastSampleA = 0.0;
+        lastSampleB = 0.0;
+        lastSampleC = 0.0;
+        lastSampleD = 0.0;
+        lastSampleE = 0.0;
+        lastSampleF = 0.0;
+        lastSampleG = 0.0;
+        lastSampleH = 0.0;
+        lastSampleI = 0.0;
+        lastSampleJ = 0.0;
+        lastSampleK = 0.0;
+        lastSampleL = 0.0;
+        lastSampleM = 0.0;
+
+        thresholdA = 0.618033988749894;
+        thresholdB = 0.679837387624884;
+        thresholdC = 0.747821126387373;
+        thresholdD = 0.82260323902611;
+        thresholdE = 0.904863562928721;
+        thresholdF = 0.995349919221593;
+        thresholdG = 1.094884911143752;
+        thresholdH = 1.204373402258128;
+        thresholdI = 1.32481074248394;
+        thresholdJ = 1.457291816732335;
+        thresholdK = 1.603020998405568;
+        thresholdL = 1.763323098246125;
+        thresholdM = 1.939655408070737;
+    }
+
+    void update(double overallscale)
+    {
+        thresholdA = 0.618033988749894 / overallscale;
+        thresholdB = 0.679837387624884 / overallscale;
+        thresholdC = 0.747821126387373 / overallscale;
+        thresholdD = 0.82260323902611 / overallscale;
+        thresholdE = 0.904863562928721 / overallscale;
+        thresholdF = 0.995349919221593 / overallscale;
+        thresholdG = 1.094884911143752 / overallscale;
+        thresholdH = 1.204373402258128 / overallscale;
+        thresholdI = 1.32481074248394 / overallscale;
+        thresholdJ = 1.457291816732335 / overallscale;
+        thresholdK = 1.603020998405568 / overallscale;
+        thresholdL = 1.763323098246125 / overallscale;
+        thresholdM = 1.939655408070737 / overallscale;
+    }
+
+    long double process(long double inputSample, double overallscale = 1.0)
+    {
+        // TODO: block process
+        update(overallscale);
+
+        long double clamp;
+        double drySample = inputSample;
+
+        // amplitude aspect
+        inputSample = sin(inputSample);
+
+        clamp = inputSample - lastSampleA;
+        if (clamp > thresholdA)
+            inputSample = lastSampleA + thresholdA;
+        if (-clamp > thresholdA)
+            inputSample = lastSampleA - thresholdA;
+
+        clamp = inputSample - lastSampleB;
+        if (clamp > thresholdB)
+            inputSample = lastSampleB + thresholdB;
+        if (-clamp > thresholdB)
+            inputSample = lastSampleB - thresholdB;
+
+        clamp = inputSample - lastSampleC;
+        if (clamp > thresholdC)
+            inputSample = lastSampleC + thresholdC;
+        if (-clamp > thresholdC)
+            inputSample = lastSampleC - thresholdC;
+
+        clamp = inputSample - lastSampleD;
+        if (clamp > thresholdD)
+            inputSample = lastSampleD + thresholdD;
+        if (-clamp > thresholdD)
+            inputSample = lastSampleD - thresholdD;
+
+        clamp = inputSample - lastSampleE;
+        if (clamp > thresholdE)
+            inputSample = lastSampleE + thresholdE;
+        if (-clamp > thresholdE)
+            inputSample = lastSampleE - thresholdE;
+
+        clamp = inputSample - lastSampleF;
+        if (clamp > thresholdF)
+            inputSample = lastSampleF + thresholdF;
+        if (-clamp > thresholdF)
+            inputSample = lastSampleF - thresholdF;
+
+        clamp = inputSample - lastSampleG;
+        if (clamp > thresholdG)
+            inputSample = lastSampleG + thresholdG;
+        if (-clamp > thresholdG)
+            inputSample = lastSampleG - thresholdG;
+
+        clamp = inputSample - lastSampleH;
+        if (clamp > thresholdH)
+            inputSample = lastSampleH + thresholdH;
+        if (-clamp > thresholdH)
+            inputSample = lastSampleH - thresholdH;
+
+        clamp = inputSample - lastSampleI;
+        if (clamp > thresholdI)
+            inputSample = lastSampleI + thresholdI;
+        if (-clamp > thresholdI)
+            inputSample = lastSampleI - thresholdI;
+
+        clamp = inputSample - lastSampleJ;
+        if (clamp > thresholdJ)
+            inputSample = lastSampleJ + thresholdJ;
+        if (-clamp > thresholdJ)
+            inputSample = lastSampleJ - thresholdJ;
+
+        clamp = inputSample - lastSampleK;
+        if (clamp > thresholdK)
+            inputSample = lastSampleK + thresholdK;
+        if (-clamp > thresholdK)
+            inputSample = lastSampleK - thresholdK;
+
+        clamp = inputSample - lastSampleL;
+        if (clamp > thresholdL)
+            inputSample = lastSampleL + thresholdL;
+        if (-clamp > thresholdL)
+            inputSample = lastSampleL - thresholdL;
+
+        clamp = inputSample - lastSampleM;
+        if (clamp > thresholdM)
+            inputSample = lastSampleM + thresholdM;
+        if (-clamp > thresholdM)
+            inputSample = lastSampleM - thresholdM;
+
+        // store the raw input sample again for use next time
+        lastSampleM = lastSampleL;
+        lastSampleL = lastSampleK;
+        lastSampleK = lastSampleJ;
+        lastSampleJ = lastSampleI;
+        lastSampleI = lastSampleH;
+        lastSampleH = lastSampleG;
+        lastSampleG = lastSampleF;
+        lastSampleF = lastSampleE;
+        lastSampleE = lastSampleD;
+        lastSampleD = lastSampleC;
+        lastSampleC = lastSampleB;
+        lastSampleB = lastSampleA;
+        lastSampleA = drySample;
+
+        return inputSample;
+    }
+};
+
+/* #atmobuss
+======================================================================================== */
+struct AtmosphereBuss {
+
+    long double lastSampleA;
+    long double lastSampleB;
+    long double lastSampleC;
+    long double lastSampleD;
+    long double lastSampleE;
+    long double lastSampleF;
+    long double lastSampleG;
+    long double lastSampleH;
+    long double lastSampleI;
+    long double lastSampleJ;
+    long double lastSampleK;
+    long double lastSampleL;
+    long double lastSampleM;
+
+    long double thresholdA;
+    long double thresholdB;
+    long double thresholdC;
+    long double thresholdD;
+    long double thresholdE;
+    long double thresholdF;
+    long double thresholdG;
+    long double thresholdH;
+    long double thresholdI;
+    long double thresholdJ;
+    long double thresholdK;
+    long double thresholdL;
+    long double thresholdM;
+
+    AtmosphereBuss()
+    {
+        lastSampleA = 0.0;
+        lastSampleB = 0.0;
+        lastSampleC = 0.0;
+        lastSampleD = 0.0;
+        lastSampleE = 0.0;
+        lastSampleF = 0.0;
+        lastSampleG = 0.0;
+        lastSampleH = 0.0;
+        lastSampleI = 0.0;
+        lastSampleJ = 0.0;
+        lastSampleK = 0.0;
+        lastSampleL = 0.0;
+        lastSampleM = 0.0;
+
+        thresholdA = 0.618033988749894;
+        thresholdB = 0.679837387624884;
+        thresholdC = 0.747821126387373;
+        thresholdD = 0.82260323902611;
+        thresholdE = 0.904863562928721;
+        thresholdF = 0.995349919221593;
+        thresholdG = 1.094884911143752;
+        thresholdH = 1.204373402258128;
+        thresholdI = 1.32481074248394;
+        thresholdJ = 1.457291816732335;
+        thresholdK = 1.603020998405568;
+        thresholdL = 1.763323098246125;
+        thresholdM = 1.939655408070737;
+    }
+
+    void update(double overallscale)
+    {
+        thresholdA = 0.618033988749894 / overallscale;
+        thresholdB = 0.679837387624884 / overallscale;
+        thresholdC = 0.747821126387373 / overallscale;
+        thresholdD = 0.82260323902611 / overallscale;
+        thresholdE = 0.904863562928721 / overallscale;
+        thresholdF = 0.995349919221593 / overallscale;
+        thresholdG = 1.094884911143752 / overallscale;
+        thresholdH = 1.204373402258128 / overallscale;
+        thresholdI = 1.32481074248394 / overallscale;
+        thresholdJ = 1.457291816732335 / overallscale;
+        thresholdK = 1.603020998405568 / overallscale;
+        thresholdL = 1.763323098246125 / overallscale;
+        thresholdM = 1.939655408070737 / overallscale;
+    }
+
+    long double process(long double inputSample, double overallscale = 1.0)
+    {
+        // TODO: block process
+        update(overallscale);
+
+        long double clamp;
+        double drySample = inputSample;
+
+        clamp = inputSample - lastSampleA;
+        if (clamp > thresholdA)
+            inputSample = lastSampleA + thresholdA;
+        if (-clamp > thresholdA)
+            inputSample = lastSampleA - thresholdA;
+
+        clamp = inputSample - lastSampleB;
+        if (clamp > thresholdB)
+            inputSample = lastSampleB + thresholdB;
+        if (-clamp > thresholdB)
+            inputSample = lastSampleB - thresholdB;
+
+        clamp = inputSample - lastSampleC;
+        if (clamp > thresholdC)
+            inputSample = lastSampleC + thresholdC;
+        if (-clamp > thresholdC)
+            inputSample = lastSampleC - thresholdC;
+
+        clamp = inputSample - lastSampleD;
+        if (clamp > thresholdD)
+            inputSample = lastSampleD + thresholdD;
+        if (-clamp > thresholdD)
+            inputSample = lastSampleD - thresholdD;
+
+        clamp = inputSample - lastSampleE;
+        if (clamp > thresholdE)
+            inputSample = lastSampleE + thresholdE;
+        if (-clamp > thresholdE)
+            inputSample = lastSampleE - thresholdE;
+
+        clamp = inputSample - lastSampleF;
+        if (clamp > thresholdF)
+            inputSample = lastSampleF + thresholdF;
+        if (-clamp > thresholdF)
+            inputSample = lastSampleF - thresholdF;
+
+        clamp = inputSample - lastSampleG;
+        if (clamp > thresholdG)
+            inputSample = lastSampleG + thresholdG;
+        if (-clamp > thresholdG)
+            inputSample = lastSampleG - thresholdG;
+
+        clamp = inputSample - lastSampleH;
+        if (clamp > thresholdH)
+            inputSample = lastSampleH + thresholdH;
+        if (-clamp > thresholdH)
+            inputSample = lastSampleH - thresholdH;
+
+        clamp = inputSample - lastSampleI;
+        if (clamp > thresholdI)
+            inputSample = lastSampleI + thresholdI;
+        if (-clamp > thresholdI)
+            inputSample = lastSampleI - thresholdI;
+
+        clamp = inputSample - lastSampleJ;
+        if (clamp > thresholdJ)
+            inputSample = lastSampleJ + thresholdJ;
+        if (-clamp > thresholdJ)
+            inputSample = lastSampleJ - thresholdJ;
+
+        clamp = inputSample - lastSampleK;
+        if (clamp > thresholdK)
+            inputSample = lastSampleK + thresholdK;
+        if (-clamp > thresholdK)
+            inputSample = lastSampleK - thresholdK;
+
+        clamp = inputSample - lastSampleL;
+        if (clamp > thresholdL)
+            inputSample = lastSampleL + thresholdL;
+        if (-clamp > thresholdL)
+            inputSample = lastSampleL - thresholdL;
+
+        clamp = inputSample - lastSampleM;
+        if (clamp > thresholdM)
+            inputSample = lastSampleM + thresholdM;
+        if (-clamp > thresholdM)
+            inputSample = lastSampleM - thresholdM;
+
+        // without this, you can get a NaN condition where it spits out DC offset at full blast!
+        if (inputSample > 1.0)
+            inputSample = 1.0;
+        if (inputSample < -1.0)
+            inputSample = -1.0;
+
+        // amplitude aspect
+        inputSample = asin(inputSample);
+
+        // store the raw input sample again for use next time
+        lastSampleM = lastSampleL;
+        lastSampleL = lastSampleK;
+        lastSampleK = lastSampleJ;
+        lastSampleJ = lastSampleI;
+        lastSampleI = lastSampleH;
+        lastSampleH = lastSampleG;
+        lastSampleG = lastSampleF;
+        lastSampleF = lastSampleE;
+        lastSampleE = lastSampleD;
+        lastSampleD = lastSampleC;
+        lastSampleC = lastSampleB;
+        lastSampleB = lastSampleA;
+        lastSampleA = drySample;
+
+        return inputSample;
+    }
+};
 
 /* #biquadbandpass
 ======================================================================================== */
@@ -142,7 +636,7 @@ struct Cans {
         inputSampleR = sin(inputSampleR);
 
         // bass narrowing filter (we are using the iir filters from out of SubsOnly)
-        long double drySampleL = inputSampleL;
+        long double drySample = inputSampleL;
         long double drySampleR = inputSampleR;
         long double bass = (mode * mode * 0.00001) / overallscale;
         long double mid = inputSampleL + inputSampleR;
@@ -195,7 +689,7 @@ struct Cans {
         }
 
         //the crossfeed
-        drySampleL += inputSampleR;
+        drySample += inputSampleR;
         drySampleR += inputSampleL;
 
         //a darkened Midiverb-style allpass, which is stretching the previous one even more
@@ -228,11 +722,11 @@ struct Cans {
         inputSampleR *= 0.25;
 
         //add the crossfeed and very faint extra verbyness
-        drySampleL += inputSampleR;
+        drySample += inputSampleR;
         drySampleR += inputSampleL;
 
         //and output our can-opened headphone feed
-        inputSampleL = drySampleL;
+        inputSampleL = drySample;
         inputSampleR = drySampleR;
 
         //bass narrowing filter
@@ -462,6 +956,143 @@ struct PeaksOnly {
         return inputSample;
     }
 }; /* end PeaksOnly */
+
+/* #Slew
+======================================================================================== */
+struct Slew {
+
+    double lastSample;
+
+    Slew()
+    {
+        lastSample = 0.0;
+    }
+
+    long double process(long double inputSample, float clampParam = 0.f, double overallscale = 1.0)
+    {
+        double clamp;
+        double threshold = pow((1 - clampParam), 4) / overallscale;
+        double outputSample;
+
+        clamp = inputSample - lastSample;
+        outputSample = inputSample;
+        if (clamp > threshold)
+            outputSample = lastSample + threshold;
+        if (-clamp > threshold)
+            outputSample = lastSample - threshold;
+        lastSample = outputSample;
+
+        return outputSample;
+    }
+}; /* end Slew */
+
+/* #slew2
+======================================================================================== */
+struct Slew2 {
+
+    double LataLast3Sample;
+    double LataLast2Sample;
+    double LataLast1Sample;
+    double LataHalfwaySample;
+    double LataHalfDrySample;
+    double LataHalfDiffSample;
+    double LataA;
+    double LataB;
+    double LataC;
+    double LataDecay;
+    double LataUpsampleHighTweak;
+    double LataDrySample;
+    double LataDiffSample;
+    double LataPrevDiffSample;
+
+    bool LataFlip; //end defining of antialiasing variables
+
+    double lastSample;
+
+    Slew2()
+    {
+        LataLast3Sample = LataLast2Sample = LataLast1Sample = 0.0;
+        LataHalfwaySample = LataHalfDrySample = LataHalfDiffSample = 0.0;
+        LataA = LataB = LataC = LataDrySample = LataDiffSample = LataPrevDiffSample = 0.0;
+        LataUpsampleHighTweak = 0.0414213562373095048801688; //more adds treble to upsampling
+        LataDecay = 0.915965594177219015; //Catalan's constant, more adds focus and clarity
+        lastSample = 0.0;
+
+        LataFlip = false; //end reset of antialias parameters
+    }
+
+    long double process(long double inputSample, float clampParam = 0.f, double overallscale = 1.0)
+    {
+        double clamp;
+        double threshold = pow((1 - clampParam), 4) / overallscale;
+
+        LataDrySample = inputSample;
+
+        LataHalfDrySample = LataHalfwaySample = (inputSample + LataLast1Sample + ((-LataLast2Sample + LataLast3Sample) * LataUpsampleHighTweak)) / 2.0;
+        LataLast3Sample = LataLast2Sample;
+        LataLast2Sample = LataLast1Sample;
+        LataLast1Sample = inputSample;
+        //setting up oversampled special antialiasing
+        //begin first half- change inputSample -> LataHalfwaySample, LataDrySample -> LataHalfDrySample
+        clamp = LataHalfwaySample - LataHalfDrySample;
+        if (clamp > threshold)
+            LataHalfwaySample = lastSample + threshold;
+        if (-clamp > threshold)
+            LataHalfwaySample = lastSample - threshold;
+        lastSample = LataHalfwaySample;
+        //end first half
+        //begin antialiasing section for halfway sample
+        LataC = LataHalfwaySample - LataHalfDrySample;
+        if (LataFlip) {
+            LataA *= LataDecay;
+            LataB *= LataDecay;
+            LataA += LataC;
+            LataB -= LataC;
+            LataC = LataA;
+        } else {
+            LataB *= LataDecay;
+            LataA *= LataDecay;
+            LataB += LataC;
+            LataA -= LataC;
+            LataC = LataB;
+        }
+        LataHalfDiffSample = (LataC * LataDecay);
+        LataFlip = !LataFlip;
+        //end antialiasing section for halfway sample
+        //begin second half- inputSample and LataDrySample handled separately here
+        clamp = inputSample - lastSample;
+        if (clamp > threshold)
+            inputSample = lastSample + threshold;
+        if (-clamp > threshold)
+            inputSample = lastSample - threshold;
+        lastSample = inputSample;
+        //end second half
+        //begin antialiasing section for input sample
+        LataC = inputSample - LataDrySample;
+        if (LataFlip) {
+            LataA *= LataDecay;
+            LataB *= LataDecay;
+            LataA += LataC;
+            LataB -= LataC;
+            LataC = LataA;
+        } else {
+            LataB *= LataDecay;
+            LataA *= LataDecay;
+            LataB += LataC;
+            LataA -= LataC;
+            LataC = LataB;
+        }
+        LataDiffSample = (LataC * LataDecay);
+        LataFlip = !LataFlip;
+        //end antialiasing section for input sample
+        inputSample = LataDrySample;
+        inputSample += ((LataDiffSample + LataHalfDiffSample + LataPrevDiffSample) / 0.734);
+        LataPrevDiffSample = LataDiffSample / 2.0;
+        //apply processing as difference to non-oversampled raw input
+
+        return inputSample;
+    }
+}; /* end Slew2 */
 
 /* #slewonly
 ======================================================================================== */
