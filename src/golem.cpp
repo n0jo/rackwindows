@@ -71,11 +71,11 @@ struct Golem : Module {
         configParam(OFFSET_TRIM_PARAM, -1.f, 1.f, 0.f, "Offset CV");
         configParam(PHASE_PARAM, 0.f, 2.f, 0.f, "Phase");
 
-        quality = loadQuality();
-        delayMode = loadDelayMode();
-        balanceTrimRange = BIPOLAR; // todo: load
-        offsetTrimRange = BIPOLAR; // todo: load
-        offsetScaling = LINEAR; // todo: load
+        quality = ECO;
+        delayMode = DI;
+        balanceTrimRange = BIPOLAR;
+        offsetTrimRange = BIPOLAR;
+        offsetScaling = LINEAR;
         onReset();
     }
 
@@ -96,6 +96,18 @@ struct Golem : Module {
         // quality
         json_object_set_new(rootJ, "quality", json_integer(quality));
 
+        // delay mode
+        json_object_set_new(rootJ, "delayMode", json_integer(delayMode));
+
+        // balance trim range
+        json_object_set_new(rootJ, "balanceTrimRange", json_integer(balanceTrimRange));
+
+        // offset trim range
+        json_object_set_new(rootJ, "offsetTrimRange", json_integer(offsetTrimRange));
+
+        // offset sclaing
+        json_object_set_new(rootJ, "offsetScaling", json_integer(offsetScaling));
+
         return rootJ;
     }
 
@@ -105,6 +117,26 @@ struct Golem : Module {
         json_t* qualityJ = json_object_get(rootJ, "quality");
         if (qualityJ)
             quality = json_integer_value(qualityJ);
+
+        // delay mode
+        json_t* delayModeJ = json_object_get(rootJ, "delayMode");
+        if (delayModeJ)
+            delayMode = json_integer_value(delayModeJ);
+
+        // balance trim range
+        json_t* balanceTrimRangeJ = json_object_get(rootJ, "balanceTrimRange");
+        if (balanceTrimRangeJ)
+            balanceTrimRange = json_integer_value(balanceTrimRangeJ);
+
+        // offset trim range
+        json_t* offsetTrimRangeJ = json_object_get(rootJ, "offsetTrimRange");
+        if (offsetTrimRangeJ)
+            offsetTrimRange = json_integer_value(offsetTrimRangeJ);
+
+        // offset scaling
+        json_t* offsetScalingJ = json_object_get(rootJ, "offsetScaling");
+        if (offsetScalingJ)
+            offsetScaling = json_integer_value(offsetScalingJ);
     }
 
     void process(const ProcessArgs& args) override

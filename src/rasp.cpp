@@ -118,6 +118,9 @@ struct Rasp : Module {
         // quality
         json_object_set_new(rootJ, "quality", json_integer(quality));
 
+        // slew type
+        json_object_set_new(rootJ, "slewType", json_integer(slewType));
+
         return rootJ;
     }
 
@@ -127,6 +130,11 @@ struct Rasp : Module {
         json_t* qualityJ = json_object_get(rootJ, "quality");
         if (qualityJ)
             quality = json_integer_value(qualityJ);
+
+        // slew type
+        json_t* slewTypeJ = json_object_get(rootJ, "slewType");
+        if (slewTypeJ)
+            slewType = json_integer_value(slewTypeJ);
     }
 
     void process(const ProcessArgs& args) override
