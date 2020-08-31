@@ -1,6 +1,8 @@
 
-### 1.1.2 (01-08-2020)
+### 1.1.2 (31-08-2020)
 - New module: Console MM
+- New module: Monitoring
+- New module: Golem
 
 ### 1.1.1 (29-07-2020)
 - New module: Holt
