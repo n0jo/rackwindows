@@ -1,3 +1,20 @@
+/***********************************************************************************************
+Rasp
+----
+VCV Rack module based on Slew/Slew2/Slew3 and Acceleration by Chris Johnson from Airwindows <www.airwindows.com>
+
+Ported and designed by Jens Robert Janke 
+
+Changes/Additions:
+- mono
+- cv inputs for clamp and limit
+- clamp and limit outputs normalled to each other
+- slew algorithm selectable via menu
+- polyphonic
+
+See ./LICENSE.md for all licenses
+************************************************************************************************/
+
 #include "plugin.hpp"
 #include "rwlib.h"
 
@@ -8,6 +25,7 @@
 // slew types
 #define SLEW2 0
 #define SLEW 1
+#define SLEW3 2
 
 // polyphony
 #define MAX_POLY_CHANNELS 16
@@ -44,8 +62,9 @@ struct Rasp : Module {
     float limitParam;
 
     // state variables
-    rwlib::Slew2 slew2[MAX_POLY_CHANNELS];
     rwlib::Slew slew[MAX_POLY_CHANNELS];
+    rwlib::Slew2 slew2[MAX_POLY_CHANNELS];
+    rwlib::Slew3 slew3[MAX_POLY_CHANNELS];
     rwlib::Acceleration acceleration[MAX_POLY_CHANNELS];
     long double fpNShapeClamp[MAX_POLY_CHANNELS];
     long double fpNShapeLimit[MAX_POLY_CHANNELS];
@@ -73,8 +92,9 @@ struct Rasp : Module {
 
         for (int i = 0; i < MAX_POLY_CHANNELS; i++) {
             {
-                slew2[i] = rwlib::Slew2();
                 slew[i] = rwlib::Slew();
+                slew2[i] = rwlib::Slew2();
+                slew3[i] = rwlib::Slew3();
                 acceleration[i] = rwlib::Acceleration();
                 fpNShapeClamp[i] = 0.0;
                 fpNShapeLimit[i] = 0.0;
@@ -140,17 +160,27 @@ struct Rasp : Module {
             // work the magic
             if (outputs[CLAMP_OUTPUT].isConnected()) {
                 if (outputs[LIMIT_OUTPUT].isConnected()) {
-                    if (slewType == SLEW) {
+                    switch (slewType) {
+                    case SLEW:
                         clampSample = slew[i].process(inputSample, clampParam, overallscale);
-                    } else {
+                        break;
+                    case SLEW2:
                         clampSample = slew2[i].process(inputSample, clampParam, overallscale);
+                        break;
+                    case SLEW3:
+                        clampSample = slew3[i].process(inputSample, clampParam, overallscale);
                     }
                 } else {
                     limitSample = acceleration[i].process(inputSample, limitParam, 1.f, overallscale);
-                    if (slewType == SLEW) {
+                    switch (slewType) {
+                    case SLEW:
                         clampSample = slew[i].process(limitSample, clampParam, overallscale);
-                    } else {
+                        break;
+                    case SLEW2:
                         clampSample = slew2[i].process(limitSample, clampParam, overallscale);
+                        break;
+                    case SLEW3:
+                        clampSample = slew3[i].process(limitSample, clampParam, overallscale);
                     }
                 }
             }
@@ -158,10 +188,15 @@ struct Rasp : Module {
                 if (outputs[CLAMP_OUTPUT].isConnected()) {
                     limitSample = acceleration[i].process(inputSample, limitParam, 1.f, overallscale);
                 } else {
-                    if (slewType == SLEW) {
+                    switch (slewType) {
+                    case SLEW:
                         clampSample = slew[i].process(inputSample, clampParam, overallscale);
-                    } else {
+                        break;
+                    case SLEW2:
                         clampSample = slew2[i].process(inputSample, clampParam, overallscale);
+                        break;
+                    case SLEW3:
+                        clampSample = slew3[i].process(inputSample, clampParam, overallscale);
                     }
                     limitSample = acceleration[i].process(clampSample, limitParam, 1.f, overallscale);
                 }
@@ -261,6 +296,12 @@ struct RaspWidget : ModuleWidget {
         slew2->module = module;
         slew2->slewType = SLEW2;
         menu->addChild(slew2);
+
+        SlewTypeItem* slew3 = new SlewTypeItem(); // Slew3
+        slew3->text = "Slew3";
+        slew3->module = module;
+        slew3->slewType = SLEW3;
+        menu->addChild(slew3);
 
         SlewTypeItem* slew = new SlewTypeItem(); // Slew
         slew->text = "Slew";

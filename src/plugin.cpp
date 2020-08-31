@@ -160,7 +160,7 @@ int loadConsoleType()
 void saveSlewType(int slewType)
 {
     json_t* settingsJ = json_object();
-    json_object_set_new(settingsJ, "slewType", json_boolean(slewType));
+    json_object_set_new(settingsJ, "slewType", json_integer(slewType));
     std::string settingsFilename = asset::user("Rackwindows.json");
     FILE* file = fopen(settingsFilename.c_str(), "w");
     if (file) {
@@ -189,7 +189,7 @@ int loadSlewType()
     }
     json_t* slewTypeJ = json_object_get(settingsJ, "slewType");
     if (slewTypeJ)
-        ret = json_boolean_value(slewTypeJ);
+        ret = json_integer_value(slewTypeJ);
 
     fclose(file);
     json_decref(settingsJ);
