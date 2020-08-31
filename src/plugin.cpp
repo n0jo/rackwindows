@@ -7,7 +7,7 @@ void init(Plugin* p)
     pluginInstance = p;
 
     // Add modules here
-    p->addModel(modelAcceleration);
+    // p->addModel(modelAcceleration);
     p->addModel(modelBitshiftgain);
     p->addModel(modelCapacitor);
     p->addModel(modelCapacitor_stereo);
@@ -15,6 +15,7 @@ void init(Plugin* p)
     p->addModel(modelConsole);
     p->addModel(modelConsole_mm);
     p->addModel(modelDistance);
+    p->addModel(modelGolem);
     p->addModel(modelHolt);
     p->addModel(modelHombre);
     p->addModel(modelInterstage);
@@ -113,7 +114,7 @@ bool loadHighQualityAsDefault()
     return ret;
 }
 
-/* #console type
+/* #console type (Console, Console MM)
 ======================================================================================== */
 void saveConsoleType(int consoleType)
 {
@@ -154,7 +155,7 @@ int loadConsoleType()
     return ret;
 }
 
-/* #slew type
+/* #slew type (Rasp)
 ======================================================================================== */
 void saveSlewType(int slewType)
 {
@@ -195,7 +196,7 @@ int loadSlewType()
     return ret;
 }
 
-/* #direct output mode
+/* #direct output mode (Console MM)
 ======================================================================================== */
 void saveDirectOutMode(bool directOutMode)
 {
@@ -210,7 +211,7 @@ void saveDirectOutMode(bool directOutMode)
     json_decref(settingsJ);
 }
 
-bool loadDirectOutMode()
+int loadDirectOutMode()
 {
     bool ret = false;
     std::string settingsFilename = asset::user("Rackwindows.json");
@@ -230,6 +231,47 @@ bool loadDirectOutMode()
     json_t* directOutModeJ = json_object_get(settingsJ, "directOutMode");
     if (directOutModeJ)
         ret = json_boolean_value(directOutModeJ);
+
+    fclose(file);
+    json_decref(settingsJ);
+    return ret;
+}
+
+/* #delay mode (Golem)
+======================================================================================== */
+void saveDelayMode(int delayMode)
+{
+    json_t* settingsJ = json_object();
+    json_object_set_new(settingsJ, "delayMode", json_boolean(delayMode));
+    std::string settingsFilename = asset::user("Rackwindows.json");
+    FILE* file = fopen(settingsFilename.c_str(), "w");
+    if (file) {
+        json_dumpf(settingsJ, file, JSON_INDENT(2) | JSON_REAL_PRECISION(9));
+        fclose(file);
+    }
+    json_decref(settingsJ);
+}
+
+int loadDelayMode()
+{
+    bool ret = false;
+    std::string settingsFilename = asset::user("Rackwindows.json");
+    FILE* file = fopen(settingsFilename.c_str(), "r");
+    if (!file) {
+        saveDelayMode(false);
+        return ret;
+    }
+    json_error_t error;
+    json_t* settingsJ = json_loadf(file, 0, &error);
+    if (!settingsJ) {
+        // invalid setting json file
+        fclose(file);
+        saveDelayMode(false);
+        return ret;
+    }
+    json_t* delayModeJ = json_object_get(settingsJ, "delayMode");
+    if (delayModeJ)
+        ret = json_boolean_value(delayModeJ);
 
     fclose(file);
     json_decref(settingsJ);

@@ -12,14 +12,7 @@
   "sourceUrl": "https://github.com/n0jo/rackwindows.git",
   "donateUrl": "",
   "changelogUrl": "https://github.com/n0jo/rackwindows/blob/master/changelog.md",
-  "modules": [{
-      "slug": "acceleration",
-      "name": "Acceleration",
-      "description": "Acceleration limiter. Tames edges, leaves brightness.",
-      "tags": [
-        "Limiter"
-      ]
-    },
+  "modules": [
     {
       "slug": "bitshiftgain",
       "name": "Dual BSG",
@@ -92,6 +85,14 @@
       ]
     },
     {
+      "slug": "golem",
+      "name": "Golem",
+      "description": "Micro-delayable crossfader",
+      "tags": [
+        "Utility"
+      ]
+    },
+    {
       "slug": "holt",
       "name": "Holt",
       "description": "Resonant lowpass filter focussed on low frequencies",
@@ -122,7 +123,7 @@
     {
       "slug": "monitoring",
       "name": "Monitoring",
-      "description": "Mixchecker",
+      "description": "Mix checker",
       "tags": [
         "Utility"
       ]
@@ -139,8 +140,14 @@
     {
       "slug": "rasp",
       "name": "Rasp",
-      "description": "",
-      "tags": []
+      "description": "De-Edger, high frequency tamer, acceleration limiter",
+      "tags": [
+        "Equalizer",
+        "EQ",
+        "Filter",
+        "Slew limiter",
+        "Polyphonic"
+      ]
     },
     {
       "slug": "reseq",

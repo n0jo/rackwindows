@@ -106,6 +106,14 @@ struct RwSwitchKnobMediumDarkTwoThirds : RwKnobMediumDark {
         snap = true;
     }
 };
+struct RwSwitchKnobMediumSix : RwKnobMediumDark {
+    RwSwitchKnobMediumSix()
+    {
+        minAngle = -0.72 * M_PI;
+        maxAngle = 0.72 * M_PI;
+        snap = true;
+    }
+};
 struct RwSwitchKnobSmall : RwKnobSmall {
     RwSwitchKnobSmall()
     {
@@ -126,6 +134,14 @@ struct RwSwitchThree : SvgSwitch {
         addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_switch_three_1.svg")));
         addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_switch_three_0.svg")));
         addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_switch_three_2.svg")));
+    }
+};
+struct RwSwitchThreeVert : SvgSwitch {
+    RwSwitchThreeVert()
+    {
+        addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_switch_three_vert_1.svg")));
+        addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_switch_three_vert_0.svg")));
+        addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/components/rw_switch_three_vert_2.svg")));
     }
 };
 struct RwCKSS : SvgSwitch {

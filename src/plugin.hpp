@@ -9,7 +9,7 @@ using namespace rack;
 extern Plugin* pluginInstance;
 
 // Declare each Model, defined in each module source file
-extern Model* modelAcceleration;
+// extern Model* modelAcceleration;
 extern Model* modelBitshiftgain;
 extern Model* modelCapacitor;
 extern Model* modelCapacitor_stereo;
@@ -17,6 +17,7 @@ extern Model* modelChorus;
 extern Model* modelConsole;
 extern Model* modelConsole_mm;
 extern Model* modelDistance;
+extern Model* modelGolem;
 extern Model* modelHolt;
 extern Model* modelHombre;
 extern Model* modelInterstage;
@@ -44,20 +45,25 @@ struct highQualityDefaultItem : MenuItem {
     }
 };
 
-/* #console type
+/* #console type (Console, Console MM)
 ======================================================================================== */
 void saveConsoleType(int consoleType);
 int loadConsoleType();
 
-/* #direct out mode
+/* #direct out mode (Console MM)
 ======================================================================================== */
 void saveDirectOutMode(int directOutMode);
-bool loadDirectOutMode();
+int loadDirectOutMode();
 
-/* #slew type
+/* #slew type (Rasp)
 ======================================================================================== */
 void saveSlewType(int slewType);
 int loadSlewType();
+
+/* #delay mode (Golem)
+======================================================================================== */
+void saveDelayMode(int delayMode);
+int loadDelayMode();
 
 /* #themes
 ======================================================================================== */
