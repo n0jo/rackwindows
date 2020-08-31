@@ -75,11 +75,11 @@ struct Rasp : Module {
     Rasp()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(CLAMP_PARAM, 0.f, 1.f, 0.f, "Clamp");
-        configParam(LIMIT_PARAM, 0.f, 1.f, 0.f, "Limit");
+        configParam(CLAMP_PARAM, 0.f, 1.f, 0.f, "Clamp", " %", 0.f, 100.f);
+        configParam(LIMIT_PARAM, 0.f, 1.f, 0.f, "Limit", " %", 0.f, 100.f);
 
-        quality = loadQuality();
-        slewType = loadSlewType();
+        quality = ECO;
+        slewType = SLEW2;
         onReset();
     }
 
@@ -296,8 +296,14 @@ struct RaspWidget : ModuleWidget {
         menu->addChild(new MenuSeparator()); // separator
 
         MenuLabel* slewLabel = new MenuLabel(); // menu label
-        slewLabel->text = "Slew Type";
+        slewLabel->text = "Clamp Type";
         menu->addChild(slewLabel);
+
+        SlewTypeItem* slew = new SlewTypeItem(); // Slew
+        slew->text = "Slew";
+        slew->module = module;
+        slew->slewType = SLEW;
+        menu->addChild(slew);
 
         SlewTypeItem* slew2 = new SlewTypeItem(); // Slew2
         slew2->text = "Slew2";
@@ -310,12 +316,6 @@ struct RaspWidget : ModuleWidget {
         slew3->module = module;
         slew3->slewType = SLEW3;
         menu->addChild(slew3);
-
-        SlewTypeItem* slew = new SlewTypeItem(); // Slew
-        slew->text = "Slew";
-        slew->module = module;
-        slew->slewType = SLEW;
-        menu->addChild(slew);
     }
 
     RaspWidget(Rasp* module)
