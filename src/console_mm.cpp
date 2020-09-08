@@ -10,6 +10,7 @@ Ported and designed by Jens Robert Janke
 Changes/Additions:
 - encodes, sums and decodes the direct outs of MixMaster
 - additional direct outputs, unprocessed or summed
+- Drive parameter -/+ 6dB
 - console types: Console6, PurestConsole
 - partly polyphonic
 
@@ -23,6 +24,14 @@ See ./LICENSE.md for all licenses
 // quality options
 #define ECO 0
 #define HIGH 1
+
+// console types
+#define CONSOLE_6 0
+#define PUREST_CONSOLE 1
+
+// direct out modes
+#define UNPROCESSED 0
+#define SUMMED 1
 
 struct Console_mm : Module {
     enum ParamIds {
@@ -45,20 +54,12 @@ struct Console_mm : Module {
     };
 
     // module variables
-    const double gainCut = 0.05;
-    const double gainBoost = 20.0;
+    const double gainCut = 0.1;
+    const double gainBoost = 10.0;
     bool quality;
     int consoleType;
     dsp::VuMeter2 vuMeters[9];
     dsp::ClockDivider lightDivider;
-    enum consoleTypes {
-        CONSOLE_6,
-        PUREST_CONSOLE
-    };
-    enum directOutModes {
-        UNPROCESSED,
-        SUMMED
-    };
     int directOutMode;
 
     // state variables (as arrays in order to handle up to 16 polyphonic channels)
@@ -67,7 +68,6 @@ struct Console_mm : Module {
     Console_mm()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        // configParam(LEVEL_PARAM, 0.f, 1.f, 1.f, "Level", " dB", -10, 20.0f * 3);
         configParam(LEVEL_PARAM, -1.f, 1.f, 0.f, "Drive", " dB", 0.f, 6.f);
 
         quality = loadQuality();
@@ -125,6 +125,7 @@ struct Console_mm : Module {
             inputSample = sin(inputSample);
             break;
         case CONSOLE_6: // Console6Channel
+            inputSample *= 0.4;
             if (inputSample > 1.0)
                 inputSample = 1.0;
             else if (inputSample > 0.0)
@@ -161,6 +162,7 @@ struct Console_mm : Module {
                 inputSample = -1.0;
             else if (inputSample < 0.0)
                 inputSample = -1.0 + pow(1.0 + inputSample, 0.5);
+            inputSample *= 2.5;
             break;
         }
         return inputSample;
@@ -276,9 +278,6 @@ struct Console_mm : Module {
                     stereoOutSum[i] *= gainBoost;
                 }
             }
-
-            // outpul level control
-            // stereoOutSum[i] *= pow(params[LEVEL_PARAM].getValue(), 3);
 
             // outputs
             outputs[OUT_OUTPUTS + i].setVoltage(stereoOutSum[i]);
