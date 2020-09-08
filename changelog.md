@@ -1,8 +1,9 @@
 
-### 1.1.2 (31-08-2020)
+### 1.1.2 (08-09-2020)
 - New module: Console MM
 - New module: Monitoring
 - New module: Golem
+- New module: Rasp
 
 ### 1.1.1 (29-07-2020)
 - New module: Holt
