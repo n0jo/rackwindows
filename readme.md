@@ -8,7 +8,7 @@ Airwindows plugins are known for exceptional sound quality, innovative approache
 
 For more in-depth information about the inner workings of a particular Airwindows plugin please check Chris' [website](http://www.airwindows.com). There is a video on every plugin along with a description and I encourage everyone to explore his body of work. Chances are you stumble upon other gems here and there. He's got a [Patreon](https://www.patreon.com/airwindows) in case you appreciate and want to support what he does.
 
-**NOTE:** Some modules act a bit differently depending on the selected sample rate and I'm looking for a fix. Keep in mind that some Airwindows plugins are actually sample rate dependent, therefore in some cases it might indeed be a feature, not a bug. There are definitely differences though between the plugin versions and the ported modules with regards to sample rate and I haven't found the explanation yet, let alone a solution. As far as I can tell, all modules behave correctly at 44.1 kHz.
+**NOTE:** Most modules act a bit differently depending on the selected sample rate, e.g. varying center frequencies on filters. Keep in mind that a number of Airwindows plugins are actually sample rate dependent, therefore in some cases it might be a feature, not a bug.
 
 ## Licence
 
@@ -19,12 +19,16 @@ See [LICENSE.md](LICENSE.md) for all licenses
 - [Capacitor Mono/Stereo](#capacitor): Filters
 - [Chorus](#chorus): Chorus with multi-tap option (Ensemble)
 - [Console](#console): Stereo summing mixer
+- [Console MM](#consolemm): Stereo summing mixer to work in conjunction with MindMeld's MixMaster
 - [Distance](#distance): Designed to mimic through-air high frequency attenuation
 - [Dual BSG](#dual-bsg): Dual gain shifter
+- [Golem](#golem): Micro-delayable Crossfader
 - [Holt](#holt): Resonant lowpass filter focussed on low frequencies
 - [Hombre](#hombre): Texas tone and texture
 - [Interstage](#interstage): Subtle analogifier
+- [Monitoring](#monitoring): Mix checker
 - [MV](#mv): Dual-mono reverb
+- [Rasp](#rasp): De-Edger, slew and acceleration limiter
 - [ResEQ](#reseq): Resonance equalizer
 - [Tape](#tape): All-purpose tape mojo
 - [Tremolo](#tremolo): Organic pulsating thing
@@ -60,6 +64,14 @@ Please check the link below for further information on how exactly this effect i
 
 **NOTE**: Due to how the encoding/decoding works, spaciousness and definition will increase with each additional channel. There will be **no effect on a single channel** at all.
 
+## Console MM <a id="consolemm"></a>
+
+This is a special version of Console designed to work alongside and interconnected with MindMeld's MixMaster module. It takes MM's polyphonic direct outs and sums the individual channels according to the selected console type. The stereo outputs can then be routed back into the chain inputs of MM to complete the roundtrip (make sure to check "Solo Chain Input" in MM, rightclick on Master). This setup conveniently provides "analogish" summing while making use of all of MM's fantastic mixing capabilities and goodies.
+
+For added flexibility and in order to honour Chris' spirit of allowing for settings beyond obvious sweetspots, the input gain can be adjusted, or - as a friend put it - taken from "can`t hear shit happening" to overdriven. 
+
+The 3 direct outputs pass on the respective input signal either unprocessed (polyphonic) or summed (mono).
+
 [More information](http://www.airwindows.com/console2)
 
 ## Distance <a id="distance"></a>
@@ -82,11 +94,17 @@ Scales a signal up or down by increments of exactly 6 dB. If no input is connect
 
 [More information](http://www.airwindows.com/bitshiftgain)
 
+## Golem <a id="golem"></a>
+
+![Rackwindows Golem](res/images/golem_panels.jpg)
+
+[More information](https://www.airwindows.com/golem-vst/)
+
 ## Holt <a id="holt"></a>
 
 Resonant lowpass filter focussed on low frequencies
 
-![Rackwindows Hombre](res/images/holt_panels.jpg)
+![Rackwindows Holt](res/images/holt_panels.jpg)
 
 Interestingly, Holt's algorithm is based on an Excel method for predicting sales figures based on trends. The result is a lowpass filter that's polite in the highs and increasingly mean towards the low-end. It also allows for seamless morphing between no poles (dry) and 4-poles (24db per octave). An additional output saturation stage helps keeping the possibly massive resonances in check (it can still get nasty though, you have been warned).
 
@@ -104,11 +122,41 @@ Texas tone and texture
 
 Subtle analogifier
 
-![Rackwindows Hombre](res/images/interstage_panels.jpg)
+![Rackwindows Interstage](res/images/interstage_panels.jpg)
 
 Well, I won't attempt to describe or even explain what this one does. Please head straight over to the Airwindows site for details. But I will say this: If I had to choose just one Airwindows tool, this would be it (or maybe Console?). It's simple, it's subtle and to my ears pure class. Put it anywhere in your patch, you can do no wrong. It will most likely be for the better :-)
 
 [More information](https://www.airwindows.com/interstage/)
+
+## Monitoring <a id="monitoring"></a>
+
+Mix checker
+
+![Rackwindows Monitoring](res/images/monitoring_panels.jpg)
+
+Monitoring is meant to be the last module before the output. It offers a number of tools to help investigate your patch and check for problems. It is calibrated in such a way that modes like *Subs* or *Peaks* will tell you unmistakably when you've got too much (or not enough) energy in a particular area.
+Additionally, it features crossfeed for headphones and optional 24/16 bit dither.
+
+### Processing modes:
+
+- Subs: This is [SubsOnly](https://www.airwindows.com/slewonly-subsonly/). Useful for checking sub-bass elements.
+- Slew: This is [SlewOnly](https://www.airwindows.com/slewonly-subsonly/). Similar to *Subs*, but for high frequency content.
+- Peaks: This is [PeaksOnly](https://www.airwindows.com/peaksonly/). Exposes bursts of excessive energy by transforming them into recognizable signals.
+- Mono: Mid or sum of the stereo channels.
+- Side: Just the side information or difference of the stereo channels.
+- Vinyl: Rolls off the extreme ends of the frequency spectrum.
+- Aurat: Same as Vinyl, but slightly narrower band.
+- Phone: Same as above, but significantly less bass and mono.
+
+### Can modes:
+
+These are somewhat sophisticated crossfeed modes for headphones. They go from relatively subtle (A) to quite obvious (D). 
+
+### Dither:
+
+You can choose between 24 and 16 bit dithering. The algorithm is [Dark](https://www.airwindows.com/dark/).
+
+[More information](https://www.airwindows.com/monitoring/)
 
 ## MV <a id="mv"></a>
 
@@ -119,6 +167,20 @@ Dual-mono reverb
 A reverb based on Bitshiftgain and old Alesis Midiverbs. Capable of turning everything into a pad or sustaining a 'bloom' forever. Watch your volume when using small amounts of depth with full on regeneration.
 
 [More information](http://www.airwindows.com/mv)
+
+## Rasp <a id="rasp"></a>
+
+De-edger, high frequency tamer, acceleration limiter
+
+![Rackwindows Rasp](res/images/rasp_panels.jpg)
+
+Rasp combines Slew/Slew2/Slew3 and Acceleration in a single module for versatile high frequency conditioning. The Slew algorithms are significantly different in character and can be selected in the menu.
+
+Routing:
+If only the *Limit* output is connected, Slew is routed into Acceleration. If only the *Clamp* output is connected, Acceleration runs into Slew. If both outputs are connected, *Clamp* outputs Slew and *Limit* outputs Accelaration.
+
+[More information on Acceleration](https://www.airwindows.com/acceleration/)
+[Slew](https://www.airwindows.com/slew-2/), [Slew2](https://www.airwindows.com/slew2-2/), [Slew3](https://www.airwindows.com/slew3/)
 
 ## ResEQ <a id="reseq"></a>
 
