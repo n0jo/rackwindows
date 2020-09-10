@@ -64,6 +64,8 @@ Please check the link below for further information on how exactly this effect i
 
 **NOTE**: Due to how the encoding/decoding works, spaciousness and definition will increase with each additional channel. There will be **no effect on a single channel** at all.
 
+[More information](http://www.airwindows.com/console2)
+
 ## Console MM <a id="consolemm"></a>
 
 This is a special version of Console designed to work alongside and interconnected with MindMeld's MixMaster module. It takes MM's polyphonic direct outs and sums the individual channels according to the selected console type. The stereo outputs can then be routed back into the chain inputs of MM to complete the roundtrip (make sure to check "Solo Chain Input" in MM, rightclick on Master). This setup conveniently provides "analogish" summing while making use of all of MM's fantastic mixing capabilities and goodies.
@@ -71,8 +73,6 @@ This is a special version of Console designed to work alongside and interconnect
 For added flexibility and in order to honour Chris' spirit of allowing for settings beyond obvious sweetspots, the input gain can be adjusted, or - as a friend put it - taken from "can`t hear shit happening" to overdriven. 
 
 The 3 direct outputs pass on the respective input signal either unprocessed (polyphonic) or summed (mono).
-
-[More information](http://www.airwindows.com/console2)
 
 ## Distance <a id="distance"></a>
 
@@ -139,14 +139,14 @@ Additionally, it features crossfeed for headphones and optional 24/16 bit dither
 
 ### Processing modes:
 
-- Subs: This is [SubsOnly](https://www.airwindows.com/slewonly-subsonly/). Useful for checking sub-bass elements.
-- Slew: This is [SlewOnly](https://www.airwindows.com/slewonly-subsonly/). Similar to *Subs*, but for high frequency content.
-- Peaks: This is [PeaksOnly](https://www.airwindows.com/peaksonly/). Exposes bursts of excessive energy by transforming them into recognizable signals.
-- Mono: Mid or sum of the stereo channels.
-- Side: Just the side information or difference of the stereo channels.
-- Vinyl: Rolls off the extreme ends of the frequency spectrum.
-- Aurat: Same as Vinyl, but slightly narrower band.
-- Phone: Same as above, but significantly less bass and mono.
+- **Subs**: This is [SubsOnly](https://www.airwindows.com/slewonly-subsonly/). Useful for checking sub-bass elements.
+- **Slew**: This is [SlewOnly](https://www.airwindows.com/slewonly-subsonly/). Similar to *Subs*, but for high frequency content.
+- **Peaks**: This is [PeaksOnly](https://www.airwindows.com/peaksonly/). Exposes bursts of excessive energy by transforming them into recognizable signals.
+- **Mono**: Mid or sum of the stereo channels.
+- **Side**: Just the side information or difference of the stereo channels.
+- **Vinyl**: Rolls off the extreme ends of the frequency spectrum.
+- **Aurat**: Same as Vinyl, but slightly narrower band.
+- **Phone**: Same as above, but significantly less bass and mono.
 
 ### Can modes:
 
@@ -176,8 +176,7 @@ De-edger, high frequency tamer, acceleration limiter
 
 Rasp combines Slew/Slew2/Slew3 and Acceleration in a single module for versatile high frequency conditioning. The Slew algorithms are significantly different in character and can be selected in the menu.
 
-Routing:
-If only the *Limit* output is connected, Slew is routed into Acceleration. If only the *Clamp* output is connected, Acceleration runs into Slew. If both outputs are connected, *Clamp* outputs Slew and *Limit* outputs Accelaration.
+**Routing:** If only the *Limit* output is connected, Slew is routed into Acceleration. If only the *Clamp* output is connected, Acceleration runs into Slew. If both outputs are connected, *Clamp* outputs Slew and *Limit* outputs Accelaration.
 
 [More information on Acceleration](https://www.airwindows.com/acceleration/)
 [Slew](https://www.airwindows.com/slew-2/), [Slew2](https://www.airwindows.com/slew2-2/), [Slew3](https://www.airwindows.com/slew3/)
