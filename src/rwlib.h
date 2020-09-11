@@ -671,10 +671,9 @@ struct GolemBCN {
         double gainL = 0.5 - balance;
         double gainR = 0.5 + balance;
         double range = 30.0;
-        if (phase == 3)
+        if (phase == 3 || phase == 4) {
             range = 700.0;
-        if (phase == 4)
-            range = 700.0;
+        }
 
         double offset = 0.0;
         if (offsetScaling == 0) {
@@ -688,10 +687,12 @@ struct GolemBCN {
         int far = near + 1;
         double nearLevel = 1.0 - farLevel;
 
-        if (phase == 2)
+        if (phase == 1 || phase == 3) {
             inputSampleL = -inputSampleL;
-        if (phase == 4)
-            inputSampleL = -inputSampleL;
+        }
+        if (phase == 2 || phase == 4) {
+            inputSampleR = -inputSampleR;
+        }
 
         inputSampleL *= gainL;
         inputSampleR *= gainR;
@@ -704,9 +705,6 @@ struct GolemBCN {
             p[count + 2048] = p[count] = inputSampleL;
             inputSampleL = p[count + near] * nearLevel;
             inputSampleL += p[count + far] * farLevel;
-
-            //consider adding third sample just to bring out superhighs subtly, like old interpolation hacks
-            //or third and fifth samples, ditto
         }
 
         if (offset < 0) {
@@ -717,7 +715,7 @@ struct GolemBCN {
 
         count -= 1;
 
-        //the output is totally mono
+        // the output is totally mono
         return inputSampleL + inputSampleR;
     }
 }; /* end GolemBCN */
