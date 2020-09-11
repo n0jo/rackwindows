@@ -2,6 +2,7 @@
 #include "components.hpp"
 #include <math.h>
 #include <rack.hpp>
+#include "rwlib.h"
 
 using namespace rack;
 
