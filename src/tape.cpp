@@ -18,6 +18,9 @@ See ./LICENSE.md for all licenses
 #define ECO 0
 #define HIGH 1
 
+// polyphony
+#define MAX_POLY_CHANNELS 16
+
 struct Tape : Module {
     enum ParamIds {
         SLAM_PARAM,
@@ -41,61 +44,30 @@ struct Tape : Module {
     };
 
     // module variables
-    const double gainCut = 0.03125;
-    const double gainBoost = 32.0;
+    const double gainCut = 0.1;
+    const double gainBoost = 10.0;
     int quality;
-    dsp::ClockDivider processDivider;
 
     // control parameters
     float slamParam;
     float bumpParam;
 
     // state variables (as arrays in order to handle up to 16 polyphonic channels)
-    double iirMidRollerAL[16];
-    double iirMidRollerBL[16];
-    double iirHeadBumpAL[16];
-    double iirHeadBumpBL[16];
-    double iirMidRollerAR[16];
-    double iirMidRollerBR[16];
-    double iirHeadBumpAR[16];
-    double iirHeadBumpBR[16];
+    rwlib::Tape tapeL[MAX_POLY_CHANNELS];
+    rwlib::Tape tapeR[MAX_POLY_CHANNELS];
+    uint32_t fpdL[MAX_POLY_CHANNELS];
+    uint32_t fpdR[MAX_POLY_CHANNELS];
 
-    long double biquadAL[16][9];
-    long double biquadBL[16][9];
-    long double biquadCL[16][9];
-    long double biquadDL[16][9];
-    long double biquadAR[16][9];
-    long double biquadBR[16][9];
-    long double biquadCR[16][9];
-    long double biquadDR[16][9];
-
-    long double lastSampleL[16];
-    long double lastSampleR[16];
-    bool flipL[16];
-    bool flipR[16];
-    uint32_t fpdL[16];
-    uint32_t fpdR[16];
-
-    // other variables, which do not need to be updated every cycle
+    // other
     double overallscale;
-    double inputgain;
-    double bumpgain;
-    double headBumpFreq;
-    double rollAmount;
-    float lastSlamParam;
-    float lastBumpParam;
-
-    // constants
-    const double softness = 0.618033988749894848204586;
 
     Tape()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(SLAM_PARAM, 0.f, 1.f, 0.5f, "Slam");
-        configParam(BUMP_PARAM, 0.f, 1.f, 0.5f, "Bump");
+        configParam(SLAM_PARAM, 0.f, 1.f, 0.5f, "Slam", "%", 0, 100);
+        configParam(BUMP_PARAM, 0.f, 1.f, 0.5f, "Bump", "%", 0, 100);
 
         quality = loadQuality();
-        processDivider.setDivision(512);
         onReset();
     }
 
@@ -103,20 +75,10 @@ struct Tape : Module {
     {
         onSampleRateChange();
 
-        lastSlamParam = 0.0;
-        lastBumpParam = 0.0;
+        for (int i = 0; i < MAX_POLY_CHANNELS; i++) {
+            tapeL[i] = rwlib::Tape();
+            tapeR[i] = rwlib::Tape();
 
-        for (int i = 0; i < 16; i++) {
-            iirMidRollerAL[i] = iirMidRollerBL[i] = iirHeadBumpAL[i] = iirHeadBumpBL[i] = 0.0;
-            iirMidRollerAR[i] = iirMidRollerBR[i] = iirHeadBumpAR[i] = iirHeadBumpBR[i] = 0.0;
-
-            for (int x = 0; x < 9; x++) {
-                biquadAL[i][x] = biquadBL[i][x] = biquadCL[i][x] = biquadDL[i][x] = 0.0;
-                biquadAR[i][x] = biquadBR[i][x] = biquadCR[i][x] = biquadDR[i][x] = 0.0;
-            }
-
-            flipL[i] = flipR[i] = false;
-            lastSampleL[i] = lastSampleR[i] = 0.0;
             fpdL[i] = fpdR[i] = 17;
         }
     }
@@ -129,8 +91,10 @@ struct Tape : Module {
         overallscale /= 44100.0;
         overallscale *= sampleRate;
 
-        headBumpFreq = 0.12 / overallscale;
-        rollAmount = (1.0 - softness) / overallscale;
+        for (int i = 0; i < MAX_POLY_CHANNELS; i++) {
+            tapeL[i].onSampleRateChange(overallscale);
+            tapeR[i].onSampleRateChange(overallscale);
+        }
     }
 
     json_t* dataToJson() override
@@ -151,248 +115,97 @@ struct Tape : Module {
             quality = json_integer_value(qualityJ);
     }
 
-    void processChannel(Input& input, Output& output, double iirMidRollerA[], double iirMidRollerB[], double iirHeadBumpA[], double iirHeadBumpB[], long double biquadA[][9], long double biquadB[][9], long double biquadC[][9], long double biquadD[][9], long double lastSample[], bool flip[], uint32_t fpd[])
+    void process(const ProcessArgs& args) override
     {
-        if (output.isConnected()) {
+        slamParam = params[SLAM_PARAM].getValue();
+        slamParam += inputs[SLAM_CV_INPUT].getVoltage() / 10;
+        slamParam = clamp(slamParam, 0.01f, 0.99f);
 
-            slamParam = params[SLAM_PARAM].getValue();
-            slamParam += inputs[SLAM_CV_INPUT].getVoltage() / 10;
-            slamParam = clamp(slamParam, 0.01f, 0.99f);
+        bumpParam = params[BUMP_PARAM].getValue();
+        bumpParam += inputs[BUMP_CV_INPUT].getVoltage() / 10;
+        bumpParam = clamp(bumpParam, 0.01f, 0.99f);
 
-            bumpParam = params[BUMP_PARAM].getValue();
-            bumpParam += inputs[BUMP_CV_INPUT].getVoltage() / 10;
-            bumpParam = clamp(bumpParam, 0.01f, 0.99f);
+        // number of polyphonic channels
+        int numChannelsL = std::max(1, inputs[IN_L_INPUT].getChannels());
+        int numChannelsR = std::max(1, inputs[IN_R_INPUT].getChannels());
 
-            if (slamParam != lastSlamParam) {
-                inputgain = pow(10.0, ((slamParam - 0.5) * 24.0) / 20.0);
-                lastSlamParam = slamParam;
-            }
+        // process left channel
+        if (outputs[OUT_L_OUTPUT].isConnected()) {
 
-            if (bumpParam != lastBumpParam) {
-                bumpgain = bumpParam * 0.1;
-                lastBumpParam = bumpParam;
-            }
-
-            double suppress;
-            long double drySample;
-            long double highsSample;
-            long double nonHighsSample;
-            long double tempSample;
-            long double groundSample;
-            long double applySoften;
-            long double inputSample;
-            double K;
-            double norm;
-
-            // number of polyphonic channels
-            int numChannels = std::max(1, input.getChannels());
-
-            // for each poly channel
-            for (int i = 0; i < numChannels; i++) {
-
-                if (processDivider.process()) {
-                    //[0] is frequency: 0.000001 to 0.499999 is near-zero to near-Nyquist
-                    //[1] is resonance, 0.7071 is Butterworth. Also can't be zero
-                    biquadA[i][0] = biquadB[i][0] = 0.0072 / overallscale;
-                    biquadA[i][1] = biquadB[i][1] = 0.0009;
-                    K = tan(M_PI * biquadB[i][0]);
-                    norm = 1.0 / (1.0 + K / biquadB[i][1] + K * K);
-                    biquadA[i][2] = biquadB[i][2] = K / biquadB[i][1] * norm;
-                    biquadA[i][4] = biquadB[i][4] = -biquadB[i][2];
-                    biquadA[i][5] = biquadB[i][5] = 2.0 * (K * K - 1.0) * norm;
-                    biquadA[i][6] = biquadB[i][6] = (1.0 - K / biquadB[i][1] + K * K) * norm;
-
-                    biquadC[i][0] = biquadD[i][0] = 0.032 / overallscale;
-                    biquadC[i][1] = biquadD[i][1] = 0.0007;
-                    K = tan(M_PI * biquadD[i][0]);
-                    norm = 1.0 / (1.0 + K / biquadD[i][1] + K * K);
-                    biquadC[i][2] = biquadD[i][2] = K / biquadD[i][1] * norm;
-                    biquadC[i][4] = biquadD[i][4] = -biquadD[i][2];
-                    biquadC[i][6] = biquadD[i][6] = (1.0 - K / biquadD[i][1] + K * K) * norm;
-                }
+            // for each poly channel left
+            for (int i = 0; i < numChannelsL; i++) {
 
                 // input
-                inputSample = input.getPolyVoltage(i);
+                long double inputSampleL = inputs[IN_L_INPUT].getPolyVoltage(i);
 
                 // pad gain
-                inputSample *= gainCut;
+                inputSampleL *= gainCut;
 
                 if (quality == HIGH) {
-                    if (fabs(inputSample) < 1.18e-37)
-                        inputSample = fpd[i] * 1.18e-37;
+                    if (fabs(inputSampleL) < 1.18e-37)
+                        inputSampleL = fpdL[i] * 1.18e-37;
                 }
 
-                drySample = inputSample;
-
-                highsSample = 0.0;
-                nonHighsSample = 0.0;
-
-                if (flip[i]) {
-                    iirMidRollerA[i] = (iirMidRollerA[i] * (1.0 - rollAmount)) + (inputSample * rollAmount);
-                    highsSample = inputSample - iirMidRollerA[i];
-                    nonHighsSample = iirMidRollerA[i];
-
-                    iirHeadBumpA[i] += (inputSample * 0.05);
-                    iirHeadBumpA[i] -= (iirHeadBumpA[i] * iirHeadBumpA[i] * iirHeadBumpA[i] * headBumpFreq);
-                    iirHeadBumpA[i] = sin(iirHeadBumpA[i]);
-
-                    tempSample = (iirHeadBumpA[i] * biquadA[i][2]) + biquadA[i][7];
-                    biquadA[i][7] = (iirHeadBumpA[i] * biquadA[i][3]) - (tempSample * biquadA[i][5]) + biquadA[i][8];
-                    biquadA[i][8] = (iirHeadBumpA[i] * biquadA[i][4]) - (tempSample * biquadA[i][6]);
-                    iirHeadBumpA[i] = tempSample; //interleaved biquad
-                    if (iirHeadBumpA[i] > 1.0)
-                        iirHeadBumpA[i] = 1.0;
-                    if (iirHeadBumpA[i] < -1.0)
-                        iirHeadBumpA[i] = -1.0;
-                    iirHeadBumpA[i] = asin(iirHeadBumpA[i]);
-
-                    inputSample = sin(inputSample);
-                    tempSample = (inputSample * biquadC[i][2]) + biquadC[i][7];
-                    biquadC[i][7] = (inputSample * biquadC[i][3]) - (tempSample * biquadC[i][5]) + biquadC[i][8];
-                    biquadC[i][8] = (inputSample * biquadC[i][4]) - (tempSample * biquadC[i][6]);
-                    inputSample = tempSample; //interleaved biquad
-                    if (inputSample > 1.0)
-                        inputSample = 1.0;
-                    if (inputSample < -1.0)
-                        inputSample = -1.0;
-                    inputSample = asin(inputSample);
-                } else {
-                    iirMidRollerB[i] = (iirMidRollerB[i] * (1.0 - rollAmount)) + (inputSample * rollAmount);
-                    highsSample = inputSample - iirMidRollerB[i];
-                    nonHighsSample = iirMidRollerB[i];
-
-                    iirHeadBumpB[i] += (inputSample * 0.05);
-                    iirHeadBumpB[i] -= (iirHeadBumpB[i] * iirHeadBumpB[i] * iirHeadBumpB[i] * headBumpFreq);
-                    iirHeadBumpB[i] = sin(iirHeadBumpB[i]);
-
-                    tempSample = (iirHeadBumpB[i] * biquadB[i][2]) + biquadB[i][7];
-                    biquadB[i][7] = (iirHeadBumpB[i] * biquadB[i][3]) - (tempSample * biquadB[i][5]) + biquadB[i][8];
-                    biquadB[i][8] = (iirHeadBumpB[i] * biquadB[i][4]) - (tempSample * biquadB[i][6]);
-                    iirHeadBumpB[i] = tempSample; //interleaved biquad
-                    if (iirHeadBumpB[i] > 1.0)
-                        iirHeadBumpB[i] = 1.0;
-                    if (iirHeadBumpB[i] < -1.0)
-                        iirHeadBumpB[i] = -1.0;
-                    iirHeadBumpB[i] = asin(iirHeadBumpB[i]);
-
-                    inputSample = sin(inputSample);
-                    tempSample = (inputSample * biquadD[i][2]) + biquadD[i][7];
-                    biquadD[i][7] = (inputSample * biquadD[i][3]) - (tempSample * biquadD[i][5]) + biquadD[i][8];
-                    biquadD[i][8] = (inputSample * biquadD[i][4]) - (tempSample * biquadD[i][6]);
-                    inputSample = tempSample; //interleaved biquad
-                    if (inputSample > 1.0)
-                        inputSample = 1.0;
-                    if (inputSample < -1.0)
-                        inputSample = -1.0;
-                    inputSample = asin(inputSample);
-                }
-                flip[i] = !flip[i];
-
-                //set up UnBox
-                groundSample = drySample - inputSample;
-
-                //gain boost inside UnBox: do not boost fringe audio
-                if (inputgain != 1.0) {
-                    inputSample *= inputgain;
-                }
-
-                //apply Soften depending on polarity
-                applySoften = fabs(highsSample) * 1.57079633;
-                if (applySoften > 1.57079633)
-                    applySoften = 1.57079633;
-                applySoften = 1 - cos(applySoften);
-                if (highsSample > 0)
-                    inputSample -= applySoften;
-                if (highsSample < 0)
-                    inputSample += applySoften;
-
-                //clip to 1.2533141373155 to reach maximum output
-                if (inputSample > 1.2533141373155)
-                    inputSample = 1.2533141373155;
-                if (inputSample < -1.2533141373155)
-                    inputSample = -1.2533141373155;
-
-                //Spiral, for cleanest most optimal tape effect
-                inputSample = sin(inputSample * fabs(inputSample)) / ((inputSample == 0.0) ? 1 : fabs(inputSample));
-
-                //restrain resonant quality of head bump algorithm
-                suppress = (1.0 - fabs(inputSample)) * 0.00013;
-                if (iirHeadBumpA[i] > suppress)
-                    iirHeadBumpA[i] -= suppress;
-                if (iirHeadBumpA[i] < -suppress)
-                    iirHeadBumpA[i] += suppress;
-                if (iirHeadBumpB[i] > suppress)
-                    iirHeadBumpB[i] -= suppress;
-                if (iirHeadBumpB[i] < -suppress)
-                    iirHeadBumpB[i] += suppress;
-
-                //apply UnBox processing
-                inputSample += groundSample;
-
-                //apply and head bump
-                inputSample += ((iirHeadBumpA[i] + iirHeadBumpB[i]) * bumpgain);
-
-                //ADClip
-                if (lastSample[i] >= 0.99) {
-                    if (inputSample < 0.99)
-                        lastSample[i] = ((0.99 * softness) + (inputSample * (1.0 - softness)));
-                    else
-                        lastSample[i] = 0.99;
-                }
-
-                if (lastSample[i] <= -0.99) {
-                    if (inputSample > -0.99)
-                        lastSample[i] = ((-0.99 * softness) + (inputSample * (1.0 - softness)));
-                    else
-                        lastSample[i] = -0.99;
-                }
-
-                if (inputSample > 0.99) {
-                    if (lastSample[i] < 0.99)
-                        inputSample = ((0.99 * softness) + (lastSample[i] * (1.0 - softness)));
-                    else
-                        inputSample = 0.99;
-                }
-
-                if (inputSample < -0.99) {
-                    if (lastSample[i] > -0.99)
-                        inputSample = ((-0.99 * softness) + (lastSample[i] * (1.0 - softness)));
-                    else
-                        inputSample = -0.99;
-                }
-                lastSample[i] = inputSample;
-
-                //final iron bar
-                if (inputSample > 0.99)
-                    inputSample = 0.99;
-                if (inputSample < -0.99)
-                    inputSample = -0.99;
+                // work the magic
+                inputSampleL = tapeL[i].process(inputSampleL, slamParam, bumpParam, overallscale);
 
                 if (quality == HIGH) {
                     //32 bit stereo floating point dither
                     int expon;
-                    frexpf((float)inputSample, &expon);
-                    fpd[i] ^= fpd[i] << 13;
-                    fpd[i] ^= fpd[i] >> 17;
-                    fpd[i] ^= fpd[i] << 5;
-                    inputSample += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
+                    frexpf((float)inputSampleL, &expon);
+                    fpdL[i] ^= fpdL[i] << 13;
+                    fpdL[i] ^= fpdL[i] >> 17;
+                    fpdL[i] ^= fpdL[i] << 5;
+                    inputSampleL += ((double(fpdL[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
                 }
 
                 // bring gain back up
-                inputSample *= gainBoost;
+                inputSampleL *= gainBoost;
 
                 // output
-                output.setChannels(numChannels);
-                output.setVoltage(inputSample, i);
-
-            } // end poly channel loop
+                outputs[OUT_L_OUTPUT].setChannels(numChannelsL);
+                outputs[OUT_L_OUTPUT].setVoltage(inputSampleL, i);
+            }
         }
-    }
 
-    void process(const ProcessArgs& args) override
-    {
-        processChannel(inputs[IN_L_INPUT], outputs[OUT_L_OUTPUT], iirMidRollerAL, iirMidRollerBL, iirHeadBumpAL, iirHeadBumpBL, biquadAL, biquadBL, biquadCL, biquadDL, lastSampleL, flipL, fpdL);
-        processChannel(inputs[IN_R_INPUT], outputs[OUT_R_OUTPUT], iirMidRollerAR, iirMidRollerBR, iirHeadBumpAR, iirHeadBumpBR, biquadAR, biquadBR, biquadCR, biquadDR, lastSampleR, flipR, fpdR);
+        // process right channel
+        if (outputs[OUT_R_OUTPUT].isConnected()) {
+
+            // for each poly channel right
+            for (int i = 0; i < numChannelsR; i++) {
+
+                // input
+                long double inputSampleR = inputs[IN_R_INPUT].getPolyVoltage(i);
+
+                // pad gain
+                inputSampleR *= gainCut;
+
+                if (quality == HIGH) {
+                    if (fabs(inputSampleR) < 1.18e-37)
+                        inputSampleR = fpdR[i] * 1.18e-37;
+                }
+
+                // work the magic
+                inputSampleR = tapeR[i].process(inputSampleR, slamParam, bumpParam, overallscale);
+
+                if (quality == HIGH) {
+                    //32 bit stereo floating point dither
+                    int expon;
+                    frexpf((float)inputSampleR, &expon);
+                    fpdR[i] ^= fpdR[i] << 13;
+                    fpdR[i] ^= fpdR[i] >> 17;
+                    fpdR[i] ^= fpdR[i] << 5;
+                    inputSampleR += ((double(fpdR[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
+                }
+
+                // bring gain back up
+                inputSampleR *= gainBoost;
+
+                // output
+                outputs[OUT_R_OUTPUT].setChannels(numChannelsR);
+                outputs[OUT_R_OUTPUT].setVoltage(inputSampleR, i);
+            }
+        }
     }
 };
 

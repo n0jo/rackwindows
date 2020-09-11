@@ -1345,6 +1345,246 @@ struct SubsOnly {
     }
 }; /* end SubsOnly */
 
+/* #tape
+======================================================================================== */
+struct Tape {
+
+    double iirMidRollerA;
+    double iirMidRollerB;
+    double iirHeadBumpA;
+    double iirHeadBumpB;
+
+    long double biquadA[9];
+    long double biquadB[9];
+    long double biquadC[9];
+    long double biquadD[9];
+
+    bool flip;
+
+    long double lastSample;
+
+    double inputgain;
+    double bumpgain;
+    double headBumpFreq;
+    double rollAmount;
+    double softness = 0.618033988749894848204586;
+
+    float lastSlamParam;
+    float lastBumpParam;
+
+    Tape()
+    {
+        iirMidRollerA = 0.0;
+        iirMidRollerB = 0.0;
+        iirHeadBumpA = 0.0;
+        iirHeadBumpB = 0.0;
+
+        for (int i = 0; i < 9; i++) {
+            biquadA[i] = 0.0;
+            biquadB[i] = 0.0;
+            biquadC[i] = 0.0;
+            biquadD[i] = 0.0;
+        }
+
+        flip = false;
+
+        lastSample = 0.0;
+
+        inputgain = 0.0;
+        bumpgain = 0.0;
+
+        lastSlamParam = 0.f;
+        lastBumpParam = 0.f;
+
+        onSampleRateChange();
+    }
+
+    void onSampleRateChange(double overallscale = 1.0)
+    {
+        headBumpFreq = 0.12 / overallscale;
+        rollAmount = (1.0 - softness) / overallscale;
+
+        biquadA[0] = biquadB[0] = 0.0072 / overallscale;
+        biquadA[1] = biquadB[1] = 0.0009;
+        double K = tan(M_PI * biquadB[0]);
+        double norm = 1.0 / (1.0 + K / biquadB[1] + K * K);
+        biquadA[2] = biquadB[2] = K / biquadB[1] * norm;
+        biquadA[4] = biquadB[4] = -biquadB[2];
+        biquadA[5] = biquadB[5] = 2.0 * (K * K - 1.0) * norm;
+        biquadA[6] = biquadB[6] = (1.0 - K / biquadB[1] + K * K) * norm;
+
+        biquadC[0] = biquadD[0] = 0.032 / overallscale;
+        biquadC[1] = biquadD[1] = 0.0007;
+        K = tan(M_PI * biquadD[0]);
+        norm = 1.0 / (1.0 + K / biquadD[1] + K * K);
+        biquadC[2] = biquadD[2] = K / biquadD[1] * norm;
+        biquadC[4] = biquadD[4] = -biquadD[2];
+        biquadC[5] = biquadD[5] = 2.0 * (K * K - 1.0) * norm;
+        biquadC[6] = biquadD[6] = (1.0 - K / biquadD[1] + K * K) * norm;
+    }
+
+    long double process(long double inputSample, float slamParam = 0.5f, float bumpParam = 0.5f, double overallscale = 1.0)
+    {
+        if (slamParam != lastSlamParam) {
+            inputgain = pow(10.0, ((slamParam - 0.5) * 24.0) / 20.0);
+            lastSlamParam = slamParam;
+        }
+
+        if (bumpParam != lastBumpParam) {
+            bumpgain = bumpParam * 0.1;
+            lastBumpParam = bumpParam;
+        }
+
+        long double drySample = inputSample;
+
+        long double highsSample = 0.0;
+        long double nonHighsSample = 0.0;
+        long double tempSample;
+
+        if (flip) {
+            iirMidRollerA = (iirMidRollerA * (1.0 - rollAmount)) + (inputSample * rollAmount);
+            highsSample = inputSample - iirMidRollerA;
+            nonHighsSample = iirMidRollerA;
+
+            iirHeadBumpA += (inputSample * 0.05);
+            iirHeadBumpA -= (iirHeadBumpA * iirHeadBumpA * iirHeadBumpA * headBumpFreq);
+            iirHeadBumpA = sin(iirHeadBumpA);
+            // interleaved biquad
+            tempSample = (iirHeadBumpA * biquadA[2]) + biquadA[7];
+            biquadA[7] = (iirHeadBumpA * biquadA[3]) - (tempSample * biquadA[5]) + biquadA[8];
+            biquadA[8] = (iirHeadBumpA * biquadA[4]) - (tempSample * biquadA[6]);
+            iirHeadBumpA = tempSample;
+            if (iirHeadBumpA > 1.0)
+                iirHeadBumpA = 1.0;
+            if (iirHeadBumpA < -1.0)
+                iirHeadBumpA = -1.0;
+            iirHeadBumpA = asin(iirHeadBumpA);
+
+            inputSample = sin(inputSample);
+            // interleaved biquad
+            tempSample = (inputSample * biquadC[2]) + biquadC[7];
+            biquadC[7] = (inputSample * biquadC[3]) - (tempSample * biquadC[5]) + biquadC[8];
+            biquadC[8] = (inputSample * biquadC[4]) - (tempSample * biquadC[6]);
+            inputSample = tempSample;
+            if (inputSample > 1.0)
+                inputSample = 1.0;
+            if (inputSample < -1.0)
+                inputSample = -1.0;
+            inputSample = asin(inputSample);
+        } else {
+            iirMidRollerB = (iirMidRollerB * (1.0 - rollAmount)) + (inputSample * rollAmount);
+            highsSample = inputSample - iirMidRollerB;
+            nonHighsSample = iirMidRollerB;
+
+            iirHeadBumpB += (inputSample * 0.05);
+            iirHeadBumpB -= (iirHeadBumpB * iirHeadBumpB * iirHeadBumpB * headBumpFreq);
+            iirHeadBumpB = sin(iirHeadBumpB);
+            // interleaved biquad
+            tempSample = (iirHeadBumpB * biquadB[2]) + biquadB[7];
+            biquadB[7] = (iirHeadBumpB * biquadB[3]) - (tempSample * biquadB[5]) + biquadB[8];
+            biquadB[8] = (iirHeadBumpB * biquadB[4]) - (tempSample * biquadB[6]);
+            iirHeadBumpB = tempSample;
+            if (iirHeadBumpB > 1.0)
+                iirHeadBumpB = 1.0;
+            if (iirHeadBumpB < -1.0)
+                iirHeadBumpB = -1.0;
+            iirHeadBumpB = asin(iirHeadBumpB);
+
+            inputSample = sin(inputSample);
+            // interleaved biquad
+            tempSample = (inputSample * biquadD[2]) + biquadD[7];
+            biquadD[7] = (inputSample * biquadD[3]) - (tempSample * biquadD[5]) + biquadD[8];
+            biquadD[8] = (inputSample * biquadD[4]) - (tempSample * biquadD[6]);
+            inputSample = tempSample;
+            if (inputSample > 1.0)
+                inputSample = 1.0;
+            if (inputSample < -1.0)
+                inputSample = -1.0;
+            inputSample = asin(inputSample);
+        }
+        flip = !flip;
+
+        // set up UnBox
+        long double groundSampleL = drySample - inputSample;
+
+        // gain boost inside UnBox: do not boost fringe audio
+        if (inputgain != 1.0) {
+            inputSample *= inputgain;
+        }
+
+        // apply Soften depending on polarity
+        long double applySoften = fabs(highsSample) * 1.57079633;
+        if (applySoften > 1.57079633)
+            applySoften = 1.57079633;
+        applySoften = 1 - cos(applySoften);
+        if (highsSample > 0)
+            inputSample -= applySoften;
+        if (highsSample < 0)
+            inputSample += applySoften;
+
+        //clip to 1.2533141373155 to reach maximum output
+        if (inputSample > 1.2533141373155)
+            inputSample = 1.2533141373155;
+        if (inputSample < -1.2533141373155)
+            inputSample = -1.2533141373155;
+
+        // Spiral, for cleanest most optimal tape effect
+        inputSample = sin(inputSample * fabs(inputSample)) / ((inputSample == 0.0) ? 1 : fabs(inputSample));
+
+        // restrain resonant quality of head bump algorithm
+        double suppress = (1.0 - fabs(inputSample)) * 0.00013;
+        if (iirHeadBumpA > suppress)
+            iirHeadBumpA -= suppress;
+        if (iirHeadBumpA < -suppress)
+            iirHeadBumpA += suppress;
+        if (iirHeadBumpB > suppress)
+            iirHeadBumpB -= suppress;
+        if (iirHeadBumpB < -suppress)
+            iirHeadBumpB += suppress;
+
+        // apply UnBox processing
+        inputSample += groundSampleL;
+
+        // apply head bump
+        inputSample += ((iirHeadBumpA + iirHeadBumpB) * bumpgain);
+
+        // ADClip
+        if (lastSample >= 0.99) {
+            if (inputSample < 0.99)
+                lastSample = ((0.99 * softness) + (inputSample * (1.0 - softness)));
+            else
+                lastSample = 0.99;
+        }
+        if (lastSample <= -0.99) {
+            if (inputSample > -0.99)
+                lastSample = ((-0.99 * softness) + (inputSample * (1.0 - softness)));
+            else
+                lastSample = -0.99;
+        }
+        if (inputSample > 0.99) {
+            if (lastSample < 0.99)
+                inputSample = ((0.99 * softness) + (lastSample * (1.0 - softness)));
+            else
+                inputSample = 0.99;
+        }
+        if (inputSample < -0.99) {
+            if (lastSample > -0.99)
+                inputSample = ((-0.99 * softness) + (lastSample * (1.0 - softness)));
+            else
+                inputSample = -0.99;
+        }
+        lastSample = inputSample;
+
+        // final iron bar
+        if (inputSample > 0.99)
+            inputSample = 0.99;
+        if (inputSample < -0.99)
+            inputSample = -0.99;
+
+        return inputSample;
+    }
+}; /* end Tape */
+
 } // namespace rwlib
 
 #endif // RWLIB_H
