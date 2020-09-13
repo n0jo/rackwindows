@@ -1,5 +1,4 @@
 #include "plugin.hpp"
-#include "rwlib.h"
 
 // quality options
 #define ECO 0

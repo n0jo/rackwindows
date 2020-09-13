@@ -13,7 +13,6 @@ See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
 #include "plugin.hpp"
-#include "rwlib.h"
 
 using namespace rwlib;
 

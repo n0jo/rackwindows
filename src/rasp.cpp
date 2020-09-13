@@ -16,7 +16,6 @@ See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
 #include "plugin.hpp"
-#include "rwlib.h"
 
 // quality options
 #define ECO 0
