@@ -58,8 +58,6 @@ struct Console_mm : Module {
     const double gainBoost = 10.0;
     bool quality;
     int consoleType;
-    dsp::VuMeter2 vuMeters[9];
-    dsp::ClockDivider lightDivider;
     int directOutMode;
 
     // state variables (as arrays in order to handle up to 16 polyphonic channels)
@@ -68,12 +66,11 @@ struct Console_mm : Module {
     Console_mm()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(LEVEL_PARAM, -1.f, 1.f, 0.f, "Drive", " dB", 0.f, 6.f);
+        configParam(LEVEL_PARAM, -1.f, 1.f, 0.f, "Drive", "%", 0.f, 100.f);
 
         quality = loadQuality();
         consoleType = loadConsoleType();
         directOutMode = loadDirectOutMode();
-        lightDivider.setDivision(512);
         onReset();
     }
 
@@ -242,8 +239,14 @@ struct Console_mm : Module {
                         directOutSum[i] += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
                     }
 
-                    // bring gain back up
-                    directOutSum[i] *= gainBoost * 0.5; // + rough compensation for summing
+                    // bring gain back up + rough compensation for summing
+                    if (params[LEVEL_PARAM].getValue() > 0.0) {
+                        directOutSum[i] *= gainBoost / (params[LEVEL_PARAM].getValue() + 1) * 0.5;
+                    } else if (params[LEVEL_PARAM].getValue() < 0.0) {
+                        directOutSum[i] *= gainBoost * (params[LEVEL_PARAM].getValue() - 1) * 0.5;
+                    } else {
+                        directOutSum[i] *= gainBoost * 0.5;
+                    }
                 }
 
                 // outputs

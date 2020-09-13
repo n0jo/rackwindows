@@ -22,6 +22,10 @@ See ./LICENSE.md for all licenses
 #define ECO 0
 #define HIGH 1
 
+// console types
+#define CONSOLE_6 0
+#define PUREST_CONSOLE 1
+
 struct Console : Module {
     enum ParamIds {
         NUM_PARAMS
@@ -44,12 +48,13 @@ struct Console : Module {
     };
 
     // module variables
-    const double gainCut = 0.03125;
-    const double gainBoost = 32.0;
+    const double gainCut = 0.1;
+    const double gainBoost = 10.0;
     bool quality;
     int consoleType;
     dsp::VuMeter2 vuMeters[9];
     dsp::ClockDivider lightDivider;
+    // float drive;
 
     // state variables (as arrays in order to handle up to 16 polyphonic channels)
     uint32_t fpd[16];
@@ -100,7 +105,12 @@ struct Console : Module {
     long double encode(long double inputSample, int consoleType = 0)
     {
         switch (consoleType) {
-        case 0: // Console6Channel
+        case PUREST_CONSOLE: // PurestConsoleChannel
+            inputSample *= 0.25;
+            inputSample = sin(inputSample);
+            break;
+        case CONSOLE_6: // Console6Channel
+            inputSample *= 0.2;
             if (inputSample > 1.0)
                 inputSample = 1.0;
             else if (inputSample > 0.0)
@@ -111,9 +121,6 @@ struct Console : Module {
             else if (inputSample < 0.0)
                 inputSample = -1.0 + pow(1.0 + inputSample, 2.0);
             break;
-        case 1: // PurestConsoleChannel
-            inputSample = sin(inputSample);
-            break;
         }
         return inputSample;
     }
@@ -121,7 +128,11 @@ struct Console : Module {
     long double decode(long double inputSample, int consoleType = 0)
     {
         switch (consoleType) {
-        case 0: // Console6Buss
+        case PUREST_CONSOLE: // PurestConsoleBuss
+            inputSample = sin(inputSample);
+            inputSample *= 4.0;
+            break;
+        case CONSOLE_6: // Console6Buss
             if (inputSample > 1.0)
                 inputSample = 1.0;
             else if (inputSample > 0.0)
@@ -131,9 +142,7 @@ struct Console : Module {
                 inputSample = -1.0;
             else if (inputSample < 0.0)
                 inputSample = -1.0 + pow(1.0 + inputSample, 0.5);
-            break;
-        case 1: // PurestConsoleBuss
-            inputSample = sin(inputSample);
+            inputSample *= 5.0;
             break;
         }
         return inputSample;
@@ -151,6 +160,8 @@ struct Console : Module {
             for (int i = 0; i < numChannels; i++) {
 
                 long double inputSample = inputSamples[i];
+
+                // inputSample *= rescale(drive, 0, 1, 0.5, 2);
 
                 // calculate sum for VU meter
                 sum += inputSample;
@@ -192,7 +203,6 @@ struct Console : Module {
                     fpd[i] ^= fpd[i] >> 17;
                     fpd[i] ^= fpd[i] << 5;
                     inputSample += ((double(fpd[i]) - uint32_t(0x7fffffff)) * 5.5e-36l * pow(2, expon + 62));
-                    //end 32 bit stereo floating point dither
                 }
 
                 // bring gain back up
@@ -278,6 +288,55 @@ struct ConsoleWidget : ModuleWidget {
         }
     };
 
+    // struct DriveSlider : ui::Slider {
+    //     struct DriveQuantity : Quantity {
+    //         Console* module;
+
+    //         DriveQuantity(Console* module)
+    //         {
+    //             this->module = module;
+    //         }
+    //         void setValue(float value) override
+    //         {
+    //             module->drive = math::clamp(value, 0.f, 1.f);
+    //         }
+    //         float getValue() override
+    //         {
+    //             return module->drive;
+    //         }
+    //         float getDefaultValue() override
+    //         {
+    //             return 0.5f;
+    //         }
+    //         float getDisplayValue() override
+    //         {
+    //             return getValue() * 12 - 6;
+    //         }
+    //         void setDisplayValue(float displayValue) override
+    //         {
+    //             setValue(displayValue / 12 - 6);
+    //         }
+    //         std::string getLabel() override
+    //         {
+    //             return "Drive";
+    //         }
+    //         std::string getUnit() override
+    //         {
+    //             return " dB";
+    //         }
+    //     };
+
+    //     DriveSlider(Console* module)
+    //     {
+    //         this->box.size.x = 100.0;
+    //         quantity = new DriveQuantity(module);
+    //     }
+    //     ~DriveSlider()
+    //     {
+    //         delete quantity;
+    //     }
+    // };
+
     void appendContextMenu(Menu* menu) override
     {
         Console* module = dynamic_cast<Console*>(this->module);
@@ -292,13 +351,13 @@ struct ConsoleWidget : ModuleWidget {
         QualityItem* low = new QualityItem(); // low quality
         low->text = "Eco";
         low->module = module;
-        low->quality = 0;
+        low->quality = ECO;
         menu->addChild(low);
 
         QualityItem* high = new QualityItem(); // high quality
         high->text = "High";
         high->module = module;
-        high->quality = 1;
+        high->quality = HIGH;
         menu->addChild(high);
 
         menu->addChild(new MenuSeparator()); // separator
@@ -310,14 +369,18 @@ struct ConsoleWidget : ModuleWidget {
         ConsoleTypeItem* console6 = new ConsoleTypeItem(); // Console6
         console6->text = "Console6";
         console6->module = module;
-        console6->consoleType = 0;
+        console6->consoleType = CONSOLE_6;
         menu->addChild(console6);
 
         ConsoleTypeItem* purestConsole = new ConsoleTypeItem(); // PurestConsole
         purestConsole->text = "PurestConsole";
         purestConsole->module = module;
-        purestConsole->consoleType = 1;
+        purestConsole->consoleType = PUREST_CONSOLE;
         menu->addChild(purestConsole);
+
+        // menu->addChild(new MenuSeparator()); // separator
+
+        // menu->addChild(new DriveSlider(module));
     }
 
     ConsoleWidget(Console* module)
@@ -327,8 +390,6 @@ struct ConsoleWidget : ModuleWidget {
         // panel
         setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/console_dark.svg")));
 
-        float center = box.size.x / 2.0f;
-
         // screws
         addChild(createWidget<ScrewBlack>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ScrewBlack>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -336,15 +397,15 @@ struct ConsoleWidget : ModuleWidget {
         addChild(createWidget<ScrewBlack>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         // lights
-        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(center, 55.0), module, Console::VU_LIGHTS + 0));
-        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(center, 85.0), module, Console::VU_LIGHTS + 1));
-        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(center, 115.0), module, Console::VU_LIGHTS + 2));
-        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(center, 145.0), module, Console::VU_LIGHTS + 3));
-        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(center, 175.0), module, Console::VU_LIGHTS + 4));
-        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(center, 205.0), module, Console::VU_LIGHTS + 5));
-        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(center, 235.0), module, Console::VU_LIGHTS + 6));
-        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(center, 265.0), module, Console::VU_LIGHTS + 7));
-        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(center, 295.0), module, Console::VU_LIGHTS + 8));
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(45.0, 55.0), module, Console::VU_LIGHTS + 0));
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(45.0, 85.0), module, Console::VU_LIGHTS + 1));
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(45.0, 115.0), module, Console::VU_LIGHTS + 2));
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(45.0, 145.0), module, Console::VU_LIGHTS + 3));
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(45.0, 175.0), module, Console::VU_LIGHTS + 4));
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(45.0, 205.0), module, Console::VU_LIGHTS + 5));
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(45.0, 235.0), module, Console::VU_LIGHTS + 6));
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(45.0, 265.0), module, Console::VU_LIGHTS + 7));
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(45.0, 295.0), module, Console::VU_LIGHTS + 8));
 
         // inputs
         addInput(createInputCentered<RwPJ301MPortSilver>(Vec(26.25, 55.0), module, Console::IN_L_INPUTS + 0));
