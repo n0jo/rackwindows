@@ -56,6 +56,8 @@ This surprisingly versatile module is a combination of Airwindows Chorus and Cho
 
 ## Console <a id="console"></a>
 
+Stereo summing mixer
+
 ![Rackwindows Console](res/images/console_panels.jpg)
 
 Airwindows Console systems sum signals in a way where the resulting soundstage appears less flat, more spacious and more in line with what we are used to from analog mixers. There are a number of variations/flavours of the console concept and this module currently implements the most recent one, Console6, and PurestConsole, which can be selected in the context menu. 
@@ -95,6 +97,8 @@ Scales a signal up or down by increments of exactly 6 dB. If no input is connect
 [More information](http://www.airwindows.com/bitshiftgain)
 
 ## Golem <a id="golem"></a>
+
+Micro-delayable crossfader
 
 ![Rackwindows Golem](res/images/golem_panels.jpg)
 
@@ -176,7 +180,7 @@ De-edger, high frequency tamer, acceleration limiter
 
 Rasp combines Slew/Slew2/Slew3 and Acceleration in a single module for versatile high frequency conditioning. The Slew algorithms are significantly different in character and can be selected in the menu.
 
-**Routing:** If only the *Limit* output is connected, Slew is routed into Acceleration. If only the *Clamp* output is connected, Acceleration runs into Slew. If both outputs are connected, *Clamp* outputs Slew and *Limit* outputs Accelaration.
+**Routing:** If only the *Limit* output is connected, Slew is routed into Acceleration. If only the *Clamp* output is connected, Acceleration runs into Slew. If both outputs are connected, *Clamp* outputs Slew and *Limit* outputs Acceleration.
 
 [More information on Acceleration](https://www.airwindows.com/acceleration/)
 [Slew](https://www.airwindows.com/slew-2/), [Slew2](https://www.airwindows.com/slew2-2/), [Slew3](https://www.airwindows.com/slew3/)
