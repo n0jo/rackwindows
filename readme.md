@@ -22,7 +22,7 @@ See [LICENSE.md](LICENSE.md) for all licenses
 - [Console MM](#consolemm): Stereo summing mixer to work in conjunction with MindMeld's MixMaster
 - [Distance](#distance): Designed to mimic through-air high frequency attenuation
 - [Dual BSG](#dual-bsg): Dual gain shifter
-- [Golem](#golem): Micro-delayable Crossfader
+- [Golem](#golem): Micro-delayable crossfader
 - [Holt](#holt): Resonant lowpass filter focussed on low frequencies
 - [Hombre](#hombre): Texas tone and texture
 - [Interstage](#interstage): Subtle analogifier
