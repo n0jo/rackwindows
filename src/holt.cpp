@@ -263,6 +263,7 @@ struct Holt : Module {
         configParam(POLES_PARAM, 0.f, 1.f, 1.f, "Poles");
 
         quality = loadQuality();
+        onReset();
     }
 
     void onSampleRateChange() override
