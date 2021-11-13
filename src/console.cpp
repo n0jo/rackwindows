@@ -182,6 +182,7 @@ struct Console : Module {
             }
             return sum;
         }
+        return 0.0f;
     }
 
     void consoleBuss(Output& output, long double mix[], int maxChannels)
