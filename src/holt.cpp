@@ -3,7 +3,7 @@ Holt
 ------
 VCV Rack module based on Holt by Chris Johnson from Airwindows <www.airwindows.com>
 
-Ported and designed by Jens Robert Janke 
+Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - mono
@@ -16,7 +16,7 @@ Changes/Additions:
 See ./LICENSE.md for all licenses
 ************************************************************************************************/
 
-/* 
+/*
     Note: for the sake of porting variety, this one encapsulates the entire audio plugin as its own entity
     Advantages: cleaner module logic, way easier and less messy handling of polyphony
     Drawbacks: possibly sliiightly less speedy
@@ -261,6 +261,14 @@ struct Holt : Module {
         configParam(FREQUENCY_PARAM, 0.f, 1.f, 1.f, "Frequency");
         configParam(RESONANCE_PARAM, 0.f, 1.f, 0.f, "Resonance");
         configParam(POLES_PARAM, 0.f, 1.f, 1.f, "Poles");
+
+        configInput(FREQUENCY_CV_INPUT, "Frequency CV");
+        configInput(RESONANCE_CV_INPUT, "Resonance CV");
+        configInput(POLES_CV_INPUT, "Poles CV");
+        configInput(IN_INPUT, "Signal");
+        configOutput(OUT_OUTPUT, "Signal");
+
+        configBypass(IN_INPUT, OUT_OUTPUT);
 
         quality = loadQuality();
     }

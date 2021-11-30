@@ -3,7 +3,7 @@ Distance
 --------
 VCV Rack module based on Distance by Chris Johnson from Airwindows <www.airwindows.com>
 
-Ported and designed by Jens Robert Janke 
+Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - mono
@@ -73,6 +73,13 @@ struct Distance : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(DISTANCE_PARAM, 0.f, 1.f, 0.f, "Distance");
         configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
+
+        configInput(DISTANCE_CV_INPUT, "Distance CV");
+        configInput(DRYWET_CV_INPUT, "Dry/wet CV");
+        configInput(IN_INPUT, "Signal");
+        configOutput(OUT_OUTPUT, "Signal");
+
+        configBypass(IN_INPUT, OUT_OUTPUT);
 
         quality = loadQuality();
         onReset();

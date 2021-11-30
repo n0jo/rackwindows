@@ -3,7 +3,7 @@ Capacitor
 ---------
 VCV Rack module based on Capacitor by Chris Johnson from Airwindows <www.airwindows.com>
 
-Ported and designed by Jens Robert Janke 
+Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - mono
@@ -79,6 +79,13 @@ struct Capacitor : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(LOWPASS_PARAM, 0.f, 1.f, 1.f, "Lowpass");
         configParam(HIGHPASS_PARAM, 0.f, 1.f, 0.f, "Highpass");
+
+        configInput(LOWPASS_CV_INPUT, "Lowpass CV");
+        configInput(HIGHPASS_CV_INPUT, "Highpass CV");
+        configInput(IN_INPUT, "Signal");
+        configOutput(OUT_OUTPUT, "Signal");
+
+        configBypass(IN_INPUT, OUT_OUTPUT);
 
         quality = loadQuality();
         onReset();

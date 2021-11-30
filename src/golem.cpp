@@ -68,7 +68,16 @@ struct Golem : Module {
         configParam(OFFSET_PARAM, -1.f, 1.f, 0.f, "Offset");
         configParam(BALANCE_TRIM_PARAM, -1.f, 1.f, 0.f, "Balance CV");
         configParam(OFFSET_TRIM_PARAM, -1.f, 1.f, 0.f, "Offset CV");
-        configParam(PHASE_PARAM, 0.f, 2.f, 0.f, "Phase");
+        configSwitch(PHASE_PARAM, 0.f, 2.f, 0.f, "Phase", {"Off", "Flip polarity channel A", "Flip polarity channel B"});
+
+        configInput(BALANCE_CV_INPUT, "Balance CV");
+        configInput(OFFSET_CV_INPUT, "Offset CV");
+        configInput(IN_A_INPUT, "Channel A");
+        configInput(IN_B_INPUT, "Channel B");
+        configOutput(OUT_POS_OUTPUT, "Positive Signal");
+        configOutput(OUT_NEG_OUTPUT, "Negative Signal");
+
+        configBypass(IN_A_INPUT, OUT_POS_OUTPUT);
 
         quality = ECO;
         delayMode = DI;

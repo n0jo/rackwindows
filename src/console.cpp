@@ -63,6 +63,19 @@ struct Console : Module {
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
+        for (int i = 0; i < 9; i++) {
+            configInput(IN_L_INPUTS + i, string::f("Channel %d L", i + 1));
+            configInput(IN_R_INPUTS + i, string::f("Channel %d R", i + 1));
+        }
+        configInput(IN_ST_L_INPUT, "Stereo Channel L");
+        configInput(IN_ST_R_INPUT, "Stereo Channel R");
+
+        configOutput(OUT_L_OUTPUT, "Mixed L");
+        configOutput(OUT_R_OUTPUT, "Mixed R");
+
+        configBypass(IN_L_INPUTS + 0, OUT_L_OUTPUT);
+        configBypass(IN_R_INPUTS + 0, OUT_R_OUTPUT);
+
         quality = loadQuality();
         consoleType = loadConsoleType();
         lightDivider.setDivision(512);
@@ -150,9 +163,9 @@ struct Console : Module {
 
     float consoleChannel(Input& input, long double mix[], int numChannels)
     {
-        if (input.isConnected()) {
-            float sum = 0.0f;
+        float sum = 0.0f;
 
+        if (input.isConnected()) {
             // input
             float inputSamples[16] = {};
             input.readVoltages(inputSamples);
@@ -180,8 +193,9 @@ struct Console : Module {
                 // add to mix
                 mix[i] += inputSample;
             }
-            return sum;
         }
+
+        return sum;
     }
 
     void consoleBuss(Output& output, long double mix[], int maxChannels)

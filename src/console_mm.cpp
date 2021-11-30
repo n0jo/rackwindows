@@ -68,6 +68,15 @@ struct Console_mm : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(LEVEL_PARAM, -1.f, 1.f, 0.f, "Drive", "%", 0.f, 100.f);
 
+        configInput(IN_INPUTS + 0, "Poly 1-8");
+        configInput(IN_INPUTS + 1, "Poly 9-16");
+        configInput(IN_INPUTS + 2, "Poly Grp/Aux");
+        configOutput(DIRECT_OUTPUTS + 0, "Poly 1-8");
+        configOutput(DIRECT_OUTPUTS + 1, "Poly 9-16");
+        configOutput(DIRECT_OUTPUTS + 2, "Poly Grp/Aux");
+        configOutput(OUT_OUTPUTS + 0, "Mix L");
+        configOutput(OUT_OUTPUTS + 1, "Mix R");
+
         quality = loadQuality();
         consoleType = loadConsoleType();
         directOutMode = loadDirectOutMode();

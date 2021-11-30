@@ -3,7 +3,7 @@ Interstage
 --------
 VCV Rack module based on Interstage by Chris Johnson from Airwindows <www.airwindows.com>
 
-Ported and designed by Jens Robert Janke 
+Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - polyphonic
@@ -71,6 +71,14 @@ struct Interstage : Module {
     Interstage()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
+
+        configInput(IN_L_INPUT, "Signal L");
+        configInput(IN_R_INPUT, "Signal R");
+        configOutput(OUT_L_OUTPUT, "Signal L");
+        configOutput(OUT_R_OUTPUT, "Signal R");
+
+        configBypass(IN_L_INPUT, OUT_L_OUTPUT);
+        configBypass(IN_R_INPUT, OUT_R_OUTPUT);
 
         quality = loadQuality();
         onReset();

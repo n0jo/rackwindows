@@ -3,7 +3,7 @@ Tape
 ----
 VCV Rack module based on Tape by Chris Johnson from Airwindows <www.airwindows.com>
 
-Ported and designed by Jens Robert Janke 
+Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - cv inputs for slam and bump
@@ -66,6 +66,16 @@ struct Tape : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(SLAM_PARAM, 0.f, 1.f, 0.5f, "Slam", "%", 0, 100);
         configParam(BUMP_PARAM, 0.f, 1.f, 0.5f, "Bump", "%", 0, 100);
+
+        configInput(SLAM_CV_INPUT, "Slam CV");
+        configInput(BUMP_CV_INPUT, "Bump CV");
+        configInput(IN_L_INPUT, "Signal L");
+        configInput(IN_R_INPUT, "Signal R");
+        configOutput(OUT_L_OUTPUT, "Signal L");
+        configOutput(OUT_R_OUTPUT, "Signal R");
+
+        configBypass(IN_L_INPUT, OUT_L_OUTPUT);
+        configBypass(IN_R_INPUT, OUT_R_OUTPUT);
 
         quality = loadQuality();
         onReset();
