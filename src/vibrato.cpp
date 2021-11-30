@@ -3,10 +3,10 @@ Vibrato
 -------
 VCV Rack module based on Vibrato by Chris Johnson from Airwindows <www.airwindows.com>
 
-Ported and designed by Jens Robert Janke 
+Ported and designed by Jens Robert Janke
 
 Changes/Additions:
-- CV inputs for speed, depth, fmspeed, fmdepth and inv/wet 
+- CV inputs for speed, depth, fmspeed, fmdepth and inv/wet
 - trigger outputs (EOC) for speed and fmspeed
 - polyphonic
 
@@ -99,6 +99,18 @@ struct Vibrato : Module {
         configParam(DEPTH_PARAM, 0.f, 1.f, 0.f, "Depth");
         configParam(FMDEPTH_PARAM, 0.f, 1.f, 0.f, "FM Depth");
         configParam(INVWET_PARAM, 0.f, 1.f, 0.5f, "Inv/Wet");
+
+        configInput(SPEED_CV_INPUT, "Speed CV");
+        configInput(DEPTH_CV_INPUT, "Depth CV");
+        configInput(FMSPEED_CV_INPUT, "FM Speed CV");
+        configInput(FMDEPTH_CV_INPUT, "FM Depth CV");
+        configInput(INVWET_CV_INPUT, "Inv/Wet CV");
+        configInput(IN_INPUT, "Signal");
+        configOutput(OUT_OUTPUT, "Signal");
+        configOutput(EOC_OUTPUT, "EOC");
+        configOutput(EOC_FM_OUTPUT, "FM EOC");
+
+        configBypass(IN_INPUT, OUT_OUTPUT);
 
         quality = loadQuality();
         onReset();

@@ -3,7 +3,7 @@ Dual BSG
 --------
 VCV Rack module based on BitshiftGain by Chris Johnson from Airwindows <www.airwindows.com>
 
-Ported and designed by Jens Robert Janke 
+Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - 2 BSG units
@@ -52,7 +52,15 @@ struct Bitshiftgain : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(SHIFT_A_PARAM, -8.0, 8.0, 0.0, "Shift");
         configParam(SHIFT_B_PARAM, -8.0, 8.0, 0.0, "Shift/Offset");
-        configParam(LINK_PARAM, 0.f, 1.f, 0.0, "Link");
+        configSwitch(LINK_PARAM, 0.f, 1.f, 0.0, "Link", {"Not linked", "Linked"});
+
+        configInput(IN_A_INPUT, "Signal A");
+        configInput(IN_B_INPUT, "Signal B");
+        configOutput(OUT_A_OUTPUT, "Signal A");
+        configOutput(OUT_B_OUTPUT, "Signal B");
+
+        configBypass(IN_A_INPUT, OUT_A_OUTPUT);
+        configBypass(IN_B_INPUT, OUT_B_OUTPUT);
 
         onReset();
     }

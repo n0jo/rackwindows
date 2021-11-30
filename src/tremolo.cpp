@@ -4,7 +4,7 @@ Tremolo
 -------
 VCV Rack module based on Tremolo by Chris Johnson from Airwindows <www.airwindows.com>
 
-Ported and designed by Jens Robert Janke 
+Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - CV inputs for speed and depth
@@ -75,6 +75,14 @@ struct Tremolo : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(SPEED_PARAM, 0.f, 1.f, 0.f, "Speed");
         configParam(DEPTH_PARAM, 0.f, 1.f, 0.f, "Depth");
+
+        configInput(CLOCK_CV_INPUT, "Clock CV");
+        configInput(SPEED_CV_INPUT, "Speed CV");
+        configInput(DEPTH_CV_INPUT, "Depth CV");
+        configInput(IN_INPUT, "Signal");
+        configOutput(OUT_OUTPUT, "Signal");
+
+        configBypass(IN_INPUT, OUT_OUTPUT);
 
         quality = loadQuality();
         onReset();

@@ -3,7 +3,7 @@ Chorus
 ------
 VCV Rack module based on Chorus by Chris Johnson from Airwindows <www.airwindows.com>
 
-Ported and designed by Jens Robert Janke 
+Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - ensemble switch: changes behaviour to ChorusEnsemble
@@ -84,7 +84,17 @@ struct Chorus : Module {
         configParam(SPEED_PARAM, 0.f, 1.f, 0.5f, "Speed");
         configParam(RANGE_PARAM, 0.f, 1.f, 0.f, "Range");
         configParam(DRYWET_PARAM, 0.f, 1.f, 1.f, "Dry/Wet");
-        configParam(ENSEMBLE_PARAM, 0.f, 1.f, 0.f, "Ensemble");
+        configSwitch(ENSEMBLE_PARAM, 0.f, 1.f, 0.f, "Ensemble", {"Off", "On"});
+
+        configInput(SPEED_CV_INPUT, "Speed CV");
+        configInput(RANGE_CV_INPUT, "Range CV");
+        configInput(IN_L_INPUT, "Signal L");
+        configInput(IN_R_INPUT, "Signal R");
+        configOutput(OUT_L_OUTPUT, "Signal L");
+        configOutput(OUT_R_OUTPUT, "Signal R");
+
+        configBypass(IN_L_INPUT, OUT_L_OUTPUT);
+        configBypass(IN_R_INPUT, OUT_R_OUTPUT);
 
         quality = loadQuality();
         isEnsemble = false;

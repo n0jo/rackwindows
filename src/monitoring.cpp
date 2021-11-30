@@ -88,7 +88,15 @@ struct Monitoring : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(MODE_PARAM, 0.f, 8.f, 0.f, "Mode");
         configParam(CANS_PARAM, 0.f, 4.f, 0.f, "Cans");
-        configParam(DITHER_PARAM, 0.f, 2.f, 0.f, "Dither");
+        configSwitch(DITHER_PARAM, 0.f, 2.f, 0.f, "Dither", {"Off", "24 bit", "16 bit"});
+
+        configInput(IN_L_INPUT, "Signal L");
+        configInput(IN_R_INPUT, "Signal R");
+        configOutput(OUT_L_OUTPUT, "Signal L");
+        configOutput(OUT_R_OUTPUT, "Signal R");
+
+        configBypass(IN_L_INPUT, OUT_L_OUTPUT);
+        configBypass(IN_R_INPUT, OUT_R_OUTPUT);
 
         onReset();
     }

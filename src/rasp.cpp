@@ -3,7 +3,7 @@ Rasp
 ----
 VCV Rack module based on Slew/Slew2/Slew3 and Acceleration by Chris Johnson from Airwindows <www.airwindows.com>
 
-Ported and designed by Jens Robert Janke 
+Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - mono
@@ -76,6 +76,15 @@ struct Rasp : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(CLAMP_PARAM, 0.f, 1.f, 0.f, "Clamp", " %", 0.f, 100.f);
         configParam(LIMIT_PARAM, 0.f, 1.f, 0.f, "Limit", " %", 0.f, 100.f);
+
+        configInput(CLAMP_CV_INPUT, "Clamp CV");
+        configInput(LIMIT_CV_INPUT, "Limit CV");
+        configInput(IN_INPUT, "Signal");
+        configOutput(CLAMP_OUTPUT, "Clamp");
+        configOutput(LIMIT_OUTPUT, "Limit");
+
+        configBypass(IN_INPUT, CLAMP_OUTPUT);
+        configBypass(IN_INPUT, LIMIT_OUTPUT);
 
         quality = ECO;
         slewType = SLEW2;

@@ -3,7 +3,7 @@ MV
 --
 VCV Rack module based on MV by Chris Johnson from Airwindows <www.airwindows.com>
 
-Ported and designed by Jens Robert Janke 
+Ported and designed by Jens Robert Janke
 
 Changes/Additions:
 - CV inputs for depth, regeneration, brightness and dry/wet
@@ -213,6 +213,18 @@ struct Mv : Module {
         configParam(BRIGHT_CV_PARAM, -1.f, 1.f, 0.f, "Brightness CV");
         configParam(DRYWET_CV_PARAM, -1.f, 1.f, 0.f, "Dry/Wet CV");
         configParam(REGEN_CV_PARAM, -1.f, 1.f, 0.f, "Regeneration CV");
+
+        configInput(DEPTH_CV_INPUT, "Depth CV");
+        configInput(BRIGHT_CV_INPUT, "Brightness CV");
+        configInput(DRYWET_CV_INPUT, "Dry/wet CV");
+        configInput(REGEN_CV_INPUT, "Regeneration CV");
+        configInput(IN_L_INPUT, "Signal L");
+        configInput(IN_R_INPUT, "Signal R");
+        configOutput(OUT_L_OUTPUT, "Signal L");
+        configOutput(OUT_R_OUTPUT, "Signal R");
+
+        configBypass(IN_L_INPUT, OUT_L_OUTPUT);
+        configBypass(IN_R_INPUT, OUT_R_OUTPUT);
 
         quality = loadQuality();
         onReset();
@@ -599,7 +611,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgAR = avgtemp;
                 }
-                //allpass filter A
+            //allpass filter A
             case 25:
                 allpasstemp = alpB - 1;
                 if (allpasstemp < 0 || allpasstemp > delayB) {
@@ -630,7 +642,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgBR = avgtemp;
                 }
-                //allpass filter B
+            //allpass filter B
             case 24:
                 allpasstemp = alpC - 1;
                 if (allpasstemp < 0 || allpasstemp > delayC) {
@@ -661,7 +673,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgCR = avgtemp;
                 }
-                //allpass filter C
+            //allpass filter C
             case 23:
                 allpasstemp = alpD - 1;
                 if (allpasstemp < 0 || allpasstemp > delayD) {
@@ -692,7 +704,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgDR = avgtemp;
                 }
-                //allpass filter D
+            //allpass filter D
             case 22:
                 allpasstemp = alpE - 1;
                 if (allpasstemp < 0 || allpasstemp > delayE) {
@@ -723,7 +735,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgER = avgtemp;
                 }
-                //allpass filter E
+            //allpass filter E
             case 21:
                 allpasstemp = alpF - 1;
                 if (allpasstemp < 0 || allpasstemp > delayF) {
@@ -754,7 +766,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgFR = avgtemp;
                 }
-                //allpass filter F
+            //allpass filter F
             case 20:
                 allpasstemp = alpG - 1;
                 if (allpasstemp < 0 || allpasstemp > delayG) {
@@ -785,7 +797,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgGR = avgtemp;
                 }
-                //allpass filter G
+            //allpass filter G
             case 19:
                 allpasstemp = alpH - 1;
                 if (allpasstemp < 0 || allpasstemp > delayH) {
@@ -816,7 +828,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgHR = avgtemp;
                 }
-                //allpass filter H
+            //allpass filter H
             case 18:
                 allpasstemp = alpI - 1;
                 if (allpasstemp < 0 || allpasstemp > delayI) {
@@ -847,7 +859,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgIR = avgtemp;
                 }
-                //allpass filter I
+            //allpass filter I
             case 17:
                 allpasstemp = alpJ - 1;
                 if (allpasstemp < 0 || allpasstemp > delayJ) {
@@ -878,7 +890,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgJR = avgtemp;
                 }
-                //allpass filter J
+            //allpass filter J
             case 16:
                 allpasstemp = alpK - 1;
                 if (allpasstemp < 0 || allpasstemp > delayK) {
@@ -909,7 +921,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgKR = avgtemp;
                 }
-                //allpass filter K
+            //allpass filter K
             case 15:
                 allpasstemp = alpL - 1;
                 if (allpasstemp < 0 || allpasstemp > delayL) {
@@ -940,7 +952,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgLR = avgtemp;
                 }
-                //allpass filter L
+            //allpass filter L
             case 14:
                 allpasstemp = alpM - 1;
                 if (allpasstemp < 0 || allpasstemp > delayM) {
@@ -971,7 +983,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgMR = avgtemp;
                 }
-                //allpass filter M
+            //allpass filter M
             case 13:
                 allpasstemp = alpN - 1;
                 if (allpasstemp < 0 || allpasstemp > delayN) {
@@ -1002,7 +1014,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgNR = avgtemp;
                 }
-                //allpass filter N
+            //allpass filter N
             case 12:
                 allpasstemp = alpO - 1;
                 if (allpasstemp < 0 || allpasstemp > delayO) {
@@ -1033,7 +1045,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgOR = avgtemp;
                 }
-                //allpass filter O
+            //allpass filter O
             case 11:
                 allpasstemp = alpP - 1;
                 if (allpasstemp < 0 || allpasstemp > delayP) {
@@ -1064,7 +1076,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgPR = avgtemp;
                 }
-                //allpass filter P
+            //allpass filter P
             case 10:
                 allpasstemp = alpQ - 1;
                 if (allpasstemp < 0 || allpasstemp > delayQ) {
@@ -1095,7 +1107,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgQR = avgtemp;
                 }
-                //allpass filter Q
+            //allpass filter Q
             case 9:
                 allpasstemp = alpR - 1;
                 if (allpasstemp < 0 || allpasstemp > delayR) {
@@ -1126,7 +1138,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgRR = avgtemp;
                 }
-                //allpass filter R
+            //allpass filter R
             case 8:
                 allpasstemp = alpS - 1;
                 if (allpasstemp < 0 || allpasstemp > delayS) {
@@ -1157,7 +1169,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgSR = avgtemp;
                 }
-                //allpass filter S
+            //allpass filter S
             case 7:
                 allpasstemp = alpT - 1;
                 if (allpasstemp < 0 || allpasstemp > delayT) {
@@ -1188,7 +1200,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgTR = avgtemp;
                 }
-                //allpass filter T
+            //allpass filter T
             case 6:
                 allpasstemp = alpU - 1;
                 if (allpasstemp < 0 || allpasstemp > delayU) {
@@ -1219,7 +1231,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgUR = avgtemp;
                 }
-                //allpass filter U
+            //allpass filter U
             case 5:
                 allpasstemp = alpV - 1;
                 if (allpasstemp < 0 || allpasstemp > delayV) {
@@ -1250,7 +1262,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgVR = avgtemp;
                 }
-                //allpass filter V
+            //allpass filter V
             case 4:
                 allpasstemp = alpW - 1;
                 if (allpasstemp < 0 || allpasstemp > delayW) {
@@ -1281,7 +1293,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgWR = avgtemp;
                 }
-                //allpass filter W
+            //allpass filter W
             case 3:
                 allpasstemp = alpX - 1;
                 if (allpasstemp < 0 || allpasstemp > delayX) {
@@ -1312,7 +1324,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgXR = avgtemp;
                 }
-                //allpass filter X
+            //allpass filter X
             case 2:
                 allpasstemp = alpY - 1;
                 if (allpasstemp < 0 || allpasstemp > delayY) {
@@ -1343,7 +1355,7 @@ struct Mv : Module {
                     inputSampleR *= 0.5;
                     avgYR = avgtemp;
                 }
-                //allpass filter Y
+            //allpass filter Y
             case 1:
                 allpasstemp = alpZ - 1;
                 if (allpasstemp < 0 || allpasstemp > delayZ) {
